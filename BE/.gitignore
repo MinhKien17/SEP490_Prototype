@@ -1,0 +1,23 @@
+# Git ignore file for the Evidence Pilot backend
+
+# ── Build output ──────────────────────────────────────────────────
+target/
+
+# ── Maven wrapper ─────────────────────────────────────────────────
+.mvn/wrapper/maven-wrapper.jar
+
+# ── IDE ───────────────────────────────────────────────────────────
+.idea/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+*.launch
+
+# ── Docker secrets – NEVER commit these ───────────────────────────
+.env
+
+# ── Uploaded files (local dev only; in Docker they go in a volume) ─
+uploads/

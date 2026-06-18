@@ -1,0 +1,17 @@
+package com.evidencepilot.repository;
+
+import com.evidencepilot.domain.entity.Source;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface SourceRepository extends JpaRepository<Source, Integer> {
+
+    List<Source> findByProjectId(Integer projectId);
+
+    List<Source> findByDatasetId(Integer datasetId);
+
+    List<Source> findByUploadedById(Integer userId);
+}

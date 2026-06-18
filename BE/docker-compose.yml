@@ -1,0 +1,67 @@
+services:
+
+  # ─────────────────────────────────────────────────────────────
+  # MySQL 8.0 database
+  # ─────────────────────────────────────────────────────────────
+  db:
+    image: mysql:8.0
+    container_name: evidence_pilot_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE:      ${MYSQL_DATABASE:-evidence_pilot}
+      MYSQL_USER:          ${MYSQL_USER:-ep_user}
+      MYSQL_PASSWORD:      ${MYSQL_PASSWORD:-ep_password}
+    ports:
+      - "${DB_PORT_HOST:-3306}:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      # schema.sql is executed ONCE on the very first container start
+      # (when db_data volume is empty).  Subsequent starts skip it.
+      # The file uses CREATE TABLE IF NOT EXISTS so re-running is safe.
+      - ./src/main/resources/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    healthcheck:
+      # Use 127.0.0.1 (TCP) not localhost (Unix socket) so the healthcheck
+      # tests the same transport that Spring Boot's JDBC driver uses.
+      # $$MYSQL_ROOT_PASSWORD reads the env var from inside the container.
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 60s
+
+  # ─────────────────────────────────────────────────────────────
+  # Spring Boot backend
+  # ─────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: evidence_pilot_be
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # ── Database ────────────────────────────────────────────
+      DB_HOST:     db
+      DB_PORT:     3306
+      DB_NAME:     ${MYSQL_DATABASE:-evidence_pilot}
+      DB_USERNAME: ${MYSQL_USER:-ep_user}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-ep_password}
+      # ── File storage ─────────────────────────────────────────
+      APP_UPLOAD_DIR: /app/uploads
+      # ── Teammate's AI model ───────────────────────────────────
+      AI_MODEL_BASE_URL: ${AI_MODEL_BASE_URL:-http://ai-model:8000}
+      AI_MODEL_API_KEY:  ${AI_MODEL_API_KEY:-}
+      # ── Server ───────────────────────────────────────────────
+      SERVER_PORT: 8080
+    ports:
+      - "${BACKEND_PORT_HOST:-8080}:8080"
+    volumes:
+      # Named volume so uploaded files survive container restarts
+      - uploads_data:/app/uploads
+
+volumes:
+  db_data:
+  uploads_data:

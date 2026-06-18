@@ -1,0 +1,79 @@
+spring:
+  # ── Disable Spring Security auto-config (we only use spring-security-crypto
+  #    for BCrypt – no filter chain, no login page, no sessions) ─────────────
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:evidence_pilot}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      # Wait up to 30 s for a single connection attempt before giving up on that attempt
+      connection-timeout: 30000
+      # 0 = keep retrying the pool on startup until the DB is available.
+      # This prevents a crash when MySQL finishes schema.sql a few seconds
+      # after the healthcheck passes.
+      initialization-fail-timeout: 0
+
+  jpa:
+    hibernate:
+      # 'update' – safe for dev; use 'validate' once schema.sql has seeded the DB
+      # in production to detect drift between schema.sql and entity definitions.
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+        # Enable Hibernate 6 native JSON mapping (used by Graph.graphData)
+        type:
+          json_format_mapper: jackson
+
+  # ── Spring Boot SQL initializer ───────────────────────────────────────────
+  # Disabled here because MySQL Docker already runs schema.sql via
+  # /docker-entrypoint-initdb.d/.  Enable with mode=always only if you want
+  # Spring Boot to re-run schema.sql against a non-Docker datasource.
+  sql:
+    init:
+      mode: never
+
+  # ── File upload limits ────────────────────────────────────────────────────
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 50MB
+      max-request-size: 52MB
+
+server:
+  port: ${SERVER_PORT:8080}
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
+
+# ── Application-level settings ────────────────────────────────────────────
+app:
+  upload:
+    # Absolute path inside the container where uploaded files land.
+    # UploadsInitializer creates this directory (and sub-dirs) on startup.
+    dir: ${APP_UPLOAD_DIR:/app/uploads}
+
+# ── External AI model integration ────────────────────────────────────────
+ai:
+  model:
+    # Base URL of the teammate's AI API (no trailing slash).
+    # Set AI_MODEL_BASE_URL in .env / docker-compose.
+    base-url: ${AI_MODEL_BASE_URL:http://localhost:8000}
+    # Optional API key forwarded as X-API-Key header.
+    api-key: ${AI_MODEL_API_KEY:}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
