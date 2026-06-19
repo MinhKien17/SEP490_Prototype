@@ -68,6 +68,13 @@ app:
     dir: ${APP_UPLOAD_DIR:/app/uploads}
 
 # ── External AI model integration ────────────────────────────────────────
+mineru:
+  # Optional. Leave blank to use Java fallback extraction.
+  command: ${MINERU_COMMAND:}
+  method: ${MINERU_METHOD:auto}
+  backend: ${MINERU_BACKEND:}
+  timeout-seconds: ${MINERU_TIMEOUT_SECONDS:600}
+
 ai:
   model:
     # Local AI API base URL. In Docker, host.docker.internal reaches the host service.

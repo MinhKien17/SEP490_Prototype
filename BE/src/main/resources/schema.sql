@@ -78,11 +78,14 @@ CREATE TABLE IF NOT EXISTS `claims` (
 -- ── 5. sources ────────────────────────────────────────────────
 --  project_id and dataset_id are both nullable (one may be absent).
 CREATE TABLE IF NOT EXISTS `sources` (
-    `id`          INT          NOT NULL AUTO_INCREMENT,
-    `file_url`    VARCHAR(500) NOT NULL COMMENT 'Absolute path inside the container',
-    `project_id`  INT          NULL,
-    `dataset_id`  INT          NULL,
-    `uploaded_by` INT          NOT NULL,
+    `id`                INT          NOT NULL AUTO_INCREMENT,
+    `file_url`          VARCHAR(500) NOT NULL COMMENT 'Absolute path inside the container',
+    `original_filename` VARCHAR(255) NULL,
+    `content_type`      VARCHAR(255) NULL,
+    `file_size_bytes`   BIGINT       NULL,
+    `project_id`        INT          NULL,
+    `dataset_id`        INT          NULL,
+    `uploaded_by`       INT          NOT NULL,
     PRIMARY KEY (`id`),
     CONSTRAINT `fk_sources_project`
         FOREIGN KEY (`project_id`)  REFERENCES `projects` (`id`)
@@ -98,6 +101,53 @@ CREATE TABLE IF NOT EXISTS `sources` (
   COLLATE=utf8mb4_unicode_ci;
 
 -- ── 6. papers ─────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS `source_texts` (
+    `id`                INT         NOT NULL AUTO_INCREMENT,
+    `source_id`         INT         NOT NULL,
+    `extracted_text`    LONGTEXT    NOT NULL,
+    `extraction_method` VARCHAR(50) NOT NULL,
+    `created_at`        DATETIME    NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_source_texts_source` (`source_id`),
+    CONSTRAINT `fk_source_texts_source`
+        FOREIGN KEY (`source_id`) REFERENCES `sources` (`id`)
+        ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `source_chunks` (
+    `id`          INT     NOT NULL AUTO_INCREMENT,
+    `source_id`   INT     NOT NULL,
+    `chunk_index` INT     NOT NULL,
+    `page`        INT     NULL,
+    `text`        TEXT    NOT NULL,
+    `active`      BOOLEAN NOT NULL DEFAULT TRUE,
+    PRIMARY KEY (`id`),
+    KEY `idx_source_chunks_source_active` (`source_id`, `active`, `chunk_index`),
+    CONSTRAINT `fk_source_chunks_source`
+        FOREIGN KEY (`source_id`) REFERENCES `sources` (`id`)
+        ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `source_references` (
+    `id`              INT          NOT NULL AUTO_INCREMENT,
+    `source_id`       INT          NOT NULL,
+    `reference_index` INT          NOT NULL,
+    `raw_text`        TEXT         NOT NULL,
+    `title`           VARCHAR(255) NULL,
+    `year`            INT          NULL,
+    PRIMARY KEY (`id`),
+    KEY `idx_source_references_source` (`source_id`, `reference_index`),
+    CONSTRAINT `fk_source_references_source`
+        FOREIGN KEY (`source_id`) REFERENCES `sources` (`id`)
+        ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `papers` (
     `id`           INT          NOT NULL AUTO_INCREMENT,
     `project_id`   INT          NOT NULL,

@@ -1,12 +1,18 @@
 package com.evidencepilot.controller;
 
 import com.evidencepilot.domain.entity.Source;
+import com.evidencepilot.domain.entity.SourceChunk;
+import com.evidencepilot.domain.entity.SourceReference;
 import com.evidencepilot.domain.entity.User;
 import com.evidencepilot.repository.DatasetRepository;
 import com.evidencepilot.repository.ProjectRepository;
 import com.evidencepilot.repository.SourceRepository;
+import com.evidencepilot.repository.SourceChunkRepository;
+import com.evidencepilot.repository.SourceReferenceRepository;
 import com.evidencepilot.repository.UserRepository;
 import com.evidencepilot.service.CurrentUserService;
+import com.evidencepilot.service.SourceExtractionService;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -40,7 +46,10 @@ public class SourceController {
     private final ProjectRepository projectRepository;
     private final DatasetRepository datasetRepository;
     private final UserRepository userRepository;
+    private final SourceChunkRepository sourceChunkRepository;
+    private final SourceReferenceRepository sourceReferenceRepository;
     private final CurrentUserService currentUserService;
+    private final SourceExtractionService sourceExtractionService;
 
     /** Root directory where uploaded files are stored inside the container. */
     @Value("${app.upload.dir:/app/uploads}")
@@ -90,6 +99,26 @@ public class SourceController {
         return sourceRepository.findByDatasetId(datasetId);
     }
 
+    @GetMapping("/{id}/chunks")
+    public List<SourceChunk> chunks(@PathVariable Integer id) {
+        User currentUser = currentUserService.requireCurrentUser();
+        Source source = sourceRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Source not found: " + id));
+        currentUserService.requireSourceAccess(currentUser, source);
+        return sourceChunkRepository.findBySourceIdAndActiveTrueOrderByChunkIndex(id);
+    }
+
+    @GetMapping("/{id}/references")
+    public List<SourceReference> references(@PathVariable Integer id) {
+        User currentUser = currentUserService.requireCurrentUser();
+        Source source = sourceRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Source not found: " + id));
+        currentUserService.requireSourceAccess(currentUser, source);
+        return sourceReferenceRepository.findBySourceIdOrderByReferenceIndex(id);
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Integer id) {
         User currentUser = currentUserService.requireCurrentUser();
@@ -116,6 +145,7 @@ public class SourceController {
      * @param datasetId   optional – if present the source is linked to this dataset
      */
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Transactional
     public ResponseEntity<Source> upload(
             @RequestParam("file") MultipartFile file,
             @RequestParam("uploadedBy") Integer uploadedById,
@@ -132,6 +162,9 @@ public class SourceController {
 
         Source source = new Source();
         source.setUploadedBy(uploader);
+        source.setOriginalFilename(safeOriginalFilename(file));
+        source.setContentType(file.getContentType());
+        source.setFileSizeBytes(file.getSize());
 
         if (projectId != null) {
             var project = projectRepository.findById(projectId)
@@ -153,6 +186,7 @@ public class SourceController {
         source.setFileUrl(savedPath);
 
         Source saved = sourceRepository.save(source);
+        sourceExtractionService.extractAndPersist(saved, file);
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
 
@@ -167,7 +201,7 @@ public class SourceController {
             Path directory = Paths.get(uploadDir, subDir);
             Files.createDirectories(directory);
 
-            String filename = UUID.randomUUID() + "_" + file.getOriginalFilename();
+            String filename = UUID.randomUUID() + "_" + safeOriginalFilename(file);
             Path destination = directory.resolve(filename);
             Files.copy(file.getInputStream(), destination, StandardCopyOption.REPLACE_EXISTING);
 
@@ -176,5 +210,14 @@ public class SourceController {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "Failed to store file: " + e.getMessage(), e);
         }
+    }
+
+    private String safeOriginalFilename(MultipartFile file) {
+        String original = file.getOriginalFilename();
+        if (original == null || original.isBlank()) {
+            return "uploaded-source";
+        }
+        String filename = Paths.get(original).getFileName().toString();
+        return filename.replaceAll("[^A-Za-z0-9._-]", "_");
     }
 }

@@ -1,0 +1,13 @@
+package com.evidencepilot.repository;
+
+import com.evidencepilot.domain.entity.SourceText;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.Optional;
+
+@Repository
+public interface SourceTextRepository extends JpaRepository<SourceText, Integer> {
+
+    Optional<SourceText> findBySourceId(Integer sourceId);
+}
