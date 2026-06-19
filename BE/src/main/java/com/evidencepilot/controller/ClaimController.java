@@ -1,11 +1,13 @@
 package com.evidencepilot.controller;
 
+import com.evidencepilot.ai.dto.ClaimMatchResponse;
 import com.evidencepilot.domain.entity.Claim;
 import com.evidencepilot.domain.entity.Project;
 import com.evidencepilot.domain.entity.User;
 import com.evidencepilot.repository.ClaimRepository;
 import com.evidencepilot.repository.ProjectRepository;
 import com.evidencepilot.service.AiAnalysisService;
+import com.evidencepilot.service.ClaimMatchingService;
 import com.evidencepilot.service.CurrentUserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -29,6 +31,7 @@ public class ClaimController {
     private final ProjectRepository projectRepository;
     private final AiAnalysisService aiAnalysisService;
     private final CurrentUserService currentUserService;
+    private final ClaimMatchingService claimMatchingService;
 
     // ── CRUD ───────────────────────────────────────────────────────────────────
 
@@ -141,5 +144,18 @@ public class ClaimController {
         } else {
             return aiAnalysisService.analyzeAndPersist(claim);
         }
+    }
+
+    @GetMapping("/{id}/matches")
+    public ClaimMatchResponse matches(
+            @PathVariable Integer id,
+            @RequestParam(defaultValue = "5") Integer topK) {
+
+        User currentUser = currentUserService.requireCurrentUser();
+        Claim claim = claimRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Claim not found: " + id));
+        currentUserService.requireClaimAccess(currentUser, claim);
+        return claimMatchingService.matchClaim(claim, topK);
     }
 }
