@@ -59,6 +59,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/users/login",
                                 "/api/users/register",
+                                "/error",
                                 // Swagger / OpenAPI docs
                                 "/v3/api-docs",
                                 "/v3/api-docs/**",
