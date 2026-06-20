@@ -25,6 +25,18 @@ public class Source {
     @Column(name = "file_url", nullable = false)
     private String fileUrl;
 
+    @Column(name = "original_filename")
+    private String originalFilename;
+
+    @Column(name = "content_type")
+    private String contentType;
+
+    @Column(name = "file_size_bytes")
+    private Long fileSizeBytes;
+
+    @Column(name = "active", nullable = false)
+    private boolean active = true;
+
     /**
      * The project this source belongs to (nullable).
      * Foreign key: sources.project_id → projects.id

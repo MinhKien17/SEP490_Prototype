@@ -7,14 +7,18 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
 
+import java.util.List;
+
 /**
  * Spring configuration that creates a pre-configured {@link RestClient} bean
  * pointing at the teammate's AI model base URL.
  *
  * <p>Configuration keys (all overridable via environment variables):
  * <ul>
- *   <li>{@code ai.model.base-url}  / {@code AI_MODEL_BASE_URL} – required</li>
- *   <li>{@code ai.model.api-key}   / {@code AI_MODEL_API_KEY}  – optional, sent as {@code X-API-Key}</li>
+ *   <li>{@code ai.model.local-base-url} / {@code AI_MODEL_LOCAL_BASE_URL} - first fallback</li>
+ *   <li>{@code ai.model.ngrok-base-url} / {@code AI_MODEL_NGROK_BASE_URL} - second fallback</li>
+ *   <li>{@code ai.model.base-url}       / {@code AI_MODEL_BASE_URL}       - final fallback</li>
+ *   <li>{@code ai.model.api-key}        / {@code AI_MODEL_API_KEY}        - optional, sent as {@code X-API-Key}</li>
  * </ul>
  * </p>
  *
@@ -26,11 +30,22 @@ import org.springframework.web.client.RestClient;
 @Configuration
 public class AiClientConfig {
 
+    @Value("${ai.model.local-base-url:}")
+    private String localBaseUrl;
+
+    @Value("${ai.model.ngrok-base-url:}")
+    private String ngrokBaseUrl;
+
     @Value("${ai.model.base-url}")
     private String baseUrl;
 
     @Value("${ai.model.api-key:}")
     private String apiKey;
+
+    @Bean("aiModelBaseUrls")
+    public List<String> aiModelBaseUrls() {
+        return List.of(localBaseUrl, ngrokBaseUrl, baseUrl);
+    }
 
     /**
      * Named bean {@code aiRestClient} injected into {@link com.evidencepilot.ai.AiModelClient}.
@@ -38,7 +53,6 @@ public class AiClientConfig {
     @Bean("aiRestClient")
     public RestClient aiRestClient() {
         RestClient.Builder builder = RestClient.builder()
-                .baseUrl(baseUrl)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
                 // Bypass ngrok browser-interstitial for any ngrok-hosted AI endpoint

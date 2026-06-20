@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 /**
  * Request DTO for user registration.
  *
- * <p>The frontend sends this payload to {@code POST /api/users/register}.
+ * <p>The frontend sends this payload to {@code POST /api/auth/register}.
  * All three fields are mandatory.</p>
  */
 @Data

@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 /**
  * Request DTO for user login.
  *
- * <p>The frontend sends this payload to {@code POST /api/users/login}.
+ * <p>The frontend sends this payload to {@code POST /api/auth/login}.
  * Both fields are mandatory; blank values are rejected by Bean Validation.</p>
  */
 @Data

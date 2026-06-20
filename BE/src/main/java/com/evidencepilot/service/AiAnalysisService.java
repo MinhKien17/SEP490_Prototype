@@ -49,6 +49,7 @@ public class AiAnalysisService {
     private final AiModelClient aiModelClient;
     private final ClaimRepository claimRepository;
     private final GraphRepository graphRepository;
+    private final ClaimMatchingService claimMatchingService;
 
     // ── Primary pipeline ───────────────────────────────────────────────────────
 
@@ -69,18 +70,12 @@ public class AiAnalysisService {
         // ── Phase 1: find the best-matching source ─────────────────────────────
         log.info("Phase 1 – matching sources for claim {}", claim.getId());
 
-        ClaimMatchResponse matchResponse;
-        try {
-            matchResponse = aiModelClient.matchClaim(ClaimMatchRequest.of(claim.getContent(), 1));
-        } catch (AiApiException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
-                    "AI match/claim call failed for claim " + claim.getId() + ": " + e.getMessage(), e);
-        }
+        ClaimMatchResponse matchResponse = claimMatchingService.matchClaim(claim, 1);
 
         if (!matchResponse.hasMatches()) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                    "No sources found in the AI system for claim " + claim.getId()
-                    + ". Upload at least one source to the AI service before analysing.");
+                    "No persisted source chunks found for claim " + claim.getId()
+                    + ". Upload at least one source to this project before analysing.");
         }
 
         ClaimMatch topMatch = matchResponse.matches().get(0);
