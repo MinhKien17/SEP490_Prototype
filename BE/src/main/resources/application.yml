@@ -66,6 +66,9 @@ app:
     # Absolute path inside the container where uploaded files land.
     # UploadsInitializer creates this directory (and sub-dirs) on startup.
     dir: ${APP_UPLOAD_DIR:/app/uploads}
+  admin:
+    email: ${ADMIN_EMAIL:}
+    password: ${ADMIN_PASSWORD:}
 
 # ── External AI model integration ────────────────────────────────────────
 mineru:
@@ -77,7 +80,10 @@ mineru:
 
 ai:
   model:
-    # Local AI API base URL. In Docker, host.docker.internal reaches the host service.
+    # Fallback order: local host AI, ngrok tunnel, then the configured/default AI service.
+    local-base-url: ${AI_MODEL_LOCAL_BASE_URL:http://127.0.0.1:8000}
+    ngrok-base-url: ${AI_MODEL_NGROK_BASE_URL:}
+    # Final fallback AI API base URL. In Docker, host.docker.internal reaches the host service.
     base-url: ${AI_MODEL_BASE_URL:http://host.docker.internal:8000}
     # Optional API key forwarded as X-API-Key header.
     api-key: ${AI_MODEL_API_KEY:}

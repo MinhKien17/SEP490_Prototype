@@ -15,8 +15,10 @@ import java.util.List;
  *
  * <p>Configuration keys (all overridable via environment variables):
  * <ul>
- *   <li>{@code ai.model.base-url}  / {@code AI_MODEL_BASE_URL} – required</li>
- *   <li>{@code ai.model.api-key}   / {@code AI_MODEL_API_KEY}  – optional, sent as {@code X-API-Key}</li>
+ *   <li>{@code ai.model.local-base-url} / {@code AI_MODEL_LOCAL_BASE_URL} - first fallback</li>
+ *   <li>{@code ai.model.ngrok-base-url} / {@code AI_MODEL_NGROK_BASE_URL} - second fallback</li>
+ *   <li>{@code ai.model.base-url}       / {@code AI_MODEL_BASE_URL}       - final fallback</li>
+ *   <li>{@code ai.model.api-key}        / {@code AI_MODEL_API_KEY}        - optional, sent as {@code X-API-Key}</li>
  * </ul>
  * </p>
  *
@@ -28,6 +30,12 @@ import java.util.List;
 @Configuration
 public class AiClientConfig {
 
+    @Value("${ai.model.local-base-url:}")
+    private String localBaseUrl;
+
+    @Value("${ai.model.ngrok-base-url:}")
+    private String ngrokBaseUrl;
+
     @Value("${ai.model.base-url}")
     private String baseUrl;
 
@@ -36,7 +44,7 @@ public class AiClientConfig {
 
     @Bean("aiModelBaseUrls")
     public List<String> aiModelBaseUrls() {
-        return List.of(baseUrl);
+        return List.of(localBaseUrl, ngrokBaseUrl, baseUrl);
     }
 
     /**
