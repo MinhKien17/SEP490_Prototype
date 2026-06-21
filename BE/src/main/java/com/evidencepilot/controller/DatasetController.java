@@ -20,6 +20,10 @@ import com.evidencepilot.service.CurrentUserService;
 import com.evidencepilot.service.QdrantClient;
 import com.evidencepilot.service.QdrantSearchResult;
 import com.evidencepilot.service.SourceExtractionService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -58,6 +62,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/datasets")
 @RequiredArgsConstructor
+@Tag(name = "Datasets", description = "Instructor dataset CRUD, source upload, chunk browsing, semantic search, and graph data")
 public class DatasetController {
 
     private final DatasetRepository datasetRepository;
@@ -72,6 +77,16 @@ public class DatasetController {
     @Value("${app.upload.dir:/app/uploads}")
     private String uploadDir = "/app/uploads";
 
+    @Operation(
+            summary = "List accessible datasets",
+            description = "Returns active datasets visible to the authenticated caller. "
+                    + "Admins receive all active datasets, instructors receive their own datasets, "
+                    + "and students receive an empty list. "
+                    + "**Security:** Requires JWT Bearer Token. **Roles Allowed:** INSTRUCTOR, ADMIN")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Dataset list returned successfully"),
+            @ApiResponse(responseCode = "401", description = "Missing or invalid JWT")
+    })
     @GetMapping
     public List<DatasetResponseDto> findAll() {
         User currentUser = currentUserService.requireCurrentUser();
@@ -86,6 +101,17 @@ public class DatasetController {
         return datasets.stream().map(DatasetResponseDto::fromEntity).toList();
     }
 
+    @Operation(
+            summary = "Get dataset by ID",
+            description = "Returns a single active dataset by ID after enforcing dataset ownership. "
+                    + "Only the owning instructor or an admin can access the dataset. "
+                    + "**Security:** Requires JWT Bearer Token. **Roles Allowed:** INSTRUCTOR, ADMIN")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Dataset returned successfully"),
+            @ApiResponse(responseCode = "401", description = "Missing or invalid JWT"),
+            @ApiResponse(responseCode = "403", description = "Forbidden - dataset access denied"),
+            @ApiResponse(responseCode = "404", description = "Dataset not found or inactive")
+    })
     @GetMapping("/{id}")
     public DatasetResponseDto findById(@PathVariable Integer id) {
         User currentUser = currentUserService.requireCurrentUser();
@@ -94,6 +120,16 @@ public class DatasetController {
         return DatasetResponseDto.fromEntity(dataset);
     }
 
+    @Operation(
+            summary = "List datasets by instructor",
+            description = "Returns active datasets owned by the specified instructor. "
+                    + "The caller must be that instructor or an admin. "
+                    + "**Security:** Requires JWT Bearer Token. **Roles Allowed:** INSTRUCTOR, ADMIN")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Instructor dataset list returned successfully"),
+            @ApiResponse(responseCode = "401", description = "Missing or invalid JWT"),
+            @ApiResponse(responseCode = "403", description = "Forbidden - instructor ID access denied")
+    })
     @GetMapping("/by-instructor/{instructorId}")
     public List<DatasetResponseDto> findByInstructor(@PathVariable Integer instructorId) {
         User currentUser = currentUserService.requireCurrentUser();
@@ -103,6 +139,17 @@ public class DatasetController {
                 .toList();
     }
 
+    @Operation(
+            summary = "Create dataset",
+            description = "Creates a dataset for the authenticated instructor. "
+                    + "Non-admin instructors are always assigned as the dataset owner server-side. "
+                    + "**Security:** Requires JWT Bearer Token. **Roles Allowed:** INSTRUCTOR, ADMIN")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Dataset created successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid dataset payload"),
+            @ApiResponse(responseCode = "401", description = "Missing or invalid JWT"),
+            @ApiResponse(responseCode = "403", description = "Forbidden - caller is not an instructor or admin")
+    })
     @PostMapping
     public ResponseEntity<DatasetResponseDto> create(@RequestBody Dataset dataset) {
         User currentUser = currentUserService.requireCurrentUser();
@@ -114,6 +161,18 @@ public class DatasetController {
         return ResponseEntity.status(HttpStatus.CREATED).body(DatasetResponseDto.fromEntity(saved));
     }
 
+    @Operation(
+            summary = "Update dataset",
+            description = "Updates an existing active dataset after enforcing dataset ownership. "
+                    + "Non-admin instructors cannot transfer ownership to another instructor. "
+                    + "**Security:** Requires JWT Bearer Token. **Roles Allowed:** INSTRUCTOR, ADMIN")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Dataset updated successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid dataset payload"),
+            @ApiResponse(responseCode = "401", description = "Missing or invalid JWT"),
+            @ApiResponse(responseCode = "403", description = "Forbidden - dataset access denied"),
+            @ApiResponse(responseCode = "404", description = "Dataset not found or inactive")
+    })
     @PutMapping("/{id}")
     public DatasetResponseDto update(@PathVariable Integer id, @RequestBody Dataset dataset) {
         User currentUser = currentUserService.requireCurrentUser();
@@ -127,6 +186,17 @@ public class DatasetController {
         return DatasetResponseDto.fromEntity(saved);
     }
 
+    @Operation(
+            summary = "Soft-delete dataset",
+            description = "Soft-deletes a dataset by setting active=false. "
+                    + "The record is preserved but excluded from active dataset reads. "
+                    + "**Security:** Requires JWT Bearer Token. **Roles Allowed:** INSTRUCTOR, ADMIN")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Dataset soft-deleted successfully"),
+            @ApiResponse(responseCode = "401", description = "Missing or invalid JWT"),
+            @ApiResponse(responseCode = "403", description = "Forbidden - dataset access denied"),
+            @ApiResponse(responseCode = "404", description = "Dataset not found or inactive")
+    })
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Integer id) {
         User currentUser = currentUserService.requireCurrentUser();
@@ -137,6 +207,20 @@ public class DatasetController {
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(
+            summary = "Upload dataset source",
+            description = "Uploads a source file into an instructor dataset. "
+                    + "The backend stores the file, creates a Source linked to the dataset, extracts text, "
+                    + "chunks the content, generates embeddings, and indexes vectors under DATASET scope. "
+                    + "**Security:** Requires JWT Bearer Token. **Roles Allowed:** INSTRUCTOR, ADMIN")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Dataset source uploaded and extracted successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid multipart request or unsafe filename"),
+            @ApiResponse(responseCode = "401", description = "Missing or invalid JWT"),
+            @ApiResponse(responseCode = "403", description = "Forbidden - dataset access denied"),
+            @ApiResponse(responseCode = "404", description = "Dataset not found or inactive"),
+            @ApiResponse(responseCode = "422", description = "Uploaded file could not be extracted")
+    })
     @PostMapping(value = "/{id}/sources", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Transactional
     public ResponseEntity<DatasetSourceUploadResponseDto> uploadSource(
@@ -159,7 +243,7 @@ public class DatasetController {
         Source saved = sourceRepository.save(source);
         sourceExtractionService.extractAndPersist(saved, file);
 
-        long chunkCount = sourceChunkRepository.countSourceId(saved.getId());
+        long chunkCount = sourceChunkRepository.countBySourceId(saved.getId());
         return ResponseEntity.status(HttpStatus.CREATED).body(new DatasetSourceUploadResponseDto(
                 dataset.getId(),
                 saved.getId(),
@@ -169,6 +253,16 @@ public class DatasetController {
         ));
     }
 
+    @Operation(
+            summary = "List dataset sources",
+            description = "Returns active source metadata for a single dataset after enforcing dataset access. "
+                    + "**Security:** Requires JWT Bearer Token. **Roles Allowed:** INSTRUCTOR, ADMIN")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Dataset source list returned successfully"),
+            @ApiResponse(responseCode = "401", description = "Missing or invalid JWT"),
+            @ApiResponse(responseCode = "403", description = "Forbidden - dataset access denied"),
+            @ApiResponse(responseCode = "404", description = "Dataset not found or inactive")
+    })
     @GetMapping("/{id}/sources")
     public List<SourceResponseDto> sources(@PathVariable Integer id) {
         User currentUser = currentUserService.requireCurrentUser();
@@ -179,6 +273,17 @@ public class DatasetController {
                 .toList();
     }
 
+    @Operation(
+            summary = "List dataset chunks (WIP)",
+            description = "Returns extracted chunks for all sources in the dataset. "
+                    + "This endpoint is intended for instructor review and graph preparation. "
+                    + "**Security:** Requires JWT Bearer Token. **Roles Allowed:** INSTRUCTOR, ADMIN")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Dataset chunks returned successfully"),
+            @ApiResponse(responseCode = "401", description = "Missing or invalid JWT"),
+            @ApiResponse(responseCode = "403", description = "Forbidden - dataset access denied"),
+            @ApiResponse(responseCode = "404", description = "Dataset not found or inactive")
+    })
     @GetMapping("/{id}/chunks")
     public List<SourceChunkResponseDto> chunks(@PathVariable Integer id) {
         User currentUser = currentUserService.requireCurrentUser();
@@ -191,6 +296,19 @@ public class DatasetController {
                 .toList();
     }
 
+    @Operation(
+            summary = "Search similar dataset chunks (WIP)",
+            description = "Embeds the query text and searches Qdrant for similar chunks inside this dataset's DATASET scope. "
+                    + "The response includes matched chunks and their Qdrant similarity scores. "
+                    + "**Security:** Requires JWT Bearer Token. **Roles Allowed:** INSTRUCTOR, ADMIN")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Similarity matches returned successfully"),
+            @ApiResponse(responseCode = "400", description = "Query is blank or invalid"),
+            @ApiResponse(responseCode = "401", description = "Missing or invalid JWT"),
+            @ApiResponse(responseCode = "403", description = "Forbidden - dataset access denied"),
+            @ApiResponse(responseCode = "404", description = "Dataset not found or inactive"),
+            @ApiResponse(responseCode = "502", description = "Embedding service or Qdrant search failed")
+    })
     @GetMapping("/{id}/similar")
     public DatasetSimilarityResponseDto similar(
             @PathVariable Integer id,
@@ -240,6 +358,17 @@ public class DatasetController {
         return new DatasetSimilarityResponseDto(dataset.getId(), query.trim(), matches);
     }
 
+    @Operation(
+            summary = "Get dataset graph data (WIP)",
+            description = "Builds graph-ready data for the dataset using source nodes, chunk nodes, and contains edges. "
+                    + "Similarity edges can be layered by clients using the similarity endpoint. "
+                    + "**Security:** Requires JWT Bearer Token. **Roles Allowed:** INSTRUCTOR, ADMIN")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Dataset graph data returned successfully"),
+            @ApiResponse(responseCode = "401", description = "Missing or invalid JWT"),
+            @ApiResponse(responseCode = "403", description = "Forbidden - dataset access denied"),
+            @ApiResponse(responseCode = "404", description = "Dataset not found or inactive")
+    })
     @GetMapping("/{id}/graph")
     public DatasetGraphResponseDto graph(@PathVariable Integer id) {
         User currentUser = currentUserService.requireCurrentUser();
