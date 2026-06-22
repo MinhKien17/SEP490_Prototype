@@ -25,12 +25,25 @@ export default function Home() {
           <a href="#features" className="text-blue-200 hover:text-white font-medium text-sm transition">Features</a>
           <a href="#about" className="text-blue-200 hover:text-white font-medium text-sm transition">About Us</a>
           {isLoggedIn ? (
-            <Link 
-              to={role === 'INSTRUCTOR' ? '/instructor/requests' : '/student/workspace'} 
-              className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-4 py-1.5 rounded text-sm font-medium transition shadow-sm"
-            >
-              Go to Workspace
-            </Link>
+            <div className="flex items-center space-x-3">
+              <Link 
+                to={role === 'INSTRUCTOR' ? '/instructor/requests' : '/student/workspace'} 
+                className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-4 py-1.5 rounded text-sm font-medium transition shadow-sm"
+              >
+                Go to Workspace
+              </Link>
+              <button 
+                onClick={() => {
+                  localStorage.removeItem('token');
+                  localStorage.removeItem('role');
+                  setIsLoggedIn(false);
+                  setRole('');
+                }}
+                className="bg-transparent hover:bg-white/10 text-white border border-white/50 px-4 py-1.5 rounded text-sm font-medium transition cursor-pointer"
+              >
+                Log Out
+              </button>
+            </div>
           ) : (
             <>
               <Link to="/login" className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-4 py-1.5 rounded text-sm font-medium transition shadow-sm">
