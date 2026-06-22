@@ -3,42 +3,10 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import FileViewerModal from '../../components/FileViewerModal';
 import api from '../../api.js';
+import { useLanguage } from '../../context/LanguageContext';
+import { UI_TEXT } from '../../constants/uiText';
 
-const RichTextEditor = React.memo(({ initialHtml, onHtmlChange }) => {
-  return (
-    <div
-      className="flex-1 bg-white text-slate-800 p-8 overflow-y-auto leading-relaxed custom-scrollbar selection:bg-indigo-100 outline-none"
-      contentEditable={true}
-      suppressContentEditableWarning={true}
-      onInput={(e) => onHtmlChange(e.target)}
-      dangerouslySetInnerHTML={{ __html: initialHtml }}
-    />
-  );
-}, () => true);
-
-export default function Workspace() {
-  const { projectId } = useParams();
-  const navigate = useNavigate();
-  const { logout, user } = useAuth();
-  const [activeTab, setActiveTab] = useState('Source');
-  const [editorMode, setEditorMode] = useState('Code');
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
-  const [showReviseModal, setShowReviseModal] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
-
-  // Backend state
-  const [project, setProject] = useState(null);
-  const [projects, setProjects] = useState([]);
-  const [sources, setSources] = useState([]);
-  const [papers, setPapers] = useState([]);
-  const [claims, setClaims] = useState([]);
-  const [feedbacks, setFeedbacks] = useState([]);
-  const [graphData, setGraphData] = useState(null);
-  const [loadingProject, setLoadingProject] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [viewerFile, setViewerFile] = useState(null);
-
-  const [codeContent, setCodeContent] = useState(`\\documentclass{article}
+const DEFAULT_SAMPLE_LATEX = `\\documentclass{article}
 \\usepackage[utf-8]{inputenc}
 \\usepackage{xcolor}
 \\usepackage{soul}
@@ -63,7 +31,48 @@ Risk management in agile projects should combine lightweight documentation, freq
 
 \\section{Addressing Common Assumptions}
 
-Some teams assume daily meetings alone are enough to control project uncertainty, but this claim still needs stronger evidence from the uploaded sources.`);
+Some teams assume daily meetings alone are enough to control project uncertainty, but this claim still needs stronger evidence from the uploaded sources.`;
+
+const RichTextEditor = React.memo(({ initialHtml, onHtmlChange }) => {
+  return (
+    <div
+      className="flex-1 bg-white text-slate-800 p-8 overflow-y-auto leading-relaxed custom-scrollbar selection:bg-indigo-100 outline-none"
+      contentEditable={true}
+      suppressContentEditableWarning={true}
+      onInput={(e) => onHtmlChange(e.target)}
+      dangerouslySetInnerHTML={{ __html: initialHtml }}
+    />
+  );
+}, () => true);
+
+export default function Workspace() {
+  const { projectId } = useParams();
+  const navigate = useNavigate();
+  const { logout, user } = useAuth();
+  const { language, toggleLanguage } = useLanguage();
+  const [activeTab, setActiveTab] = useState('Source');
+  const [editorMode, setEditorMode] = useState('Code');
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showReviseModal, setShowReviseModal] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+
+  // Backend state
+  const [project, setProject] = useState(null);
+  const [projects, setProjects] = useState([]);
+  const [sources, setSources] = useState([]);
+  const [papers, setPapers] = useState([]);
+  const [selectedPaper, setSelectedPaper] = useState(null);
+  const [claims, setClaims] = useState([]);
+  const [feedbacks, setFeedbacks] = useState([]);
+  const [graphData, setGraphData] = useState(null);
+  const [loadingProject, setLoadingProject] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [viewerFile, setViewerFile] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+
+  const [codeContent, setCodeContent] = useState('');
+
+  const displayContent = selectedPaper ? codeContent : DEFAULT_SAMPLE_LATEX;
 
   // 1. Tải thông tin người dùng hiện tại
   useEffect(() => {
@@ -143,7 +152,7 @@ Some teams assume daily meetings alone are enough to control project uncertainty
         // Nếu không có projectId trên URL, chọn cái đầu tiên
         if (!currentProjectId && activeProjects.length > 0) {
           currentProjectId = activeProjects[0].id;
-          navigate(`/student/workspace/${currentProjectId}`, { replace: true });
+          navigate(`/student/projects/${currentProjectId}`, { replace: true });
           return;
         }
 
@@ -175,7 +184,7 @@ Some teams assume daily meetings alone are enough to control project uncertainty
       const listRes = await api.get('/api/projects');
       const activeProjects = listRes.data || [];
       setProjects(activeProjects);
-      navigate(`/student/workspace/${res.data.id}`);
+      navigate(`/student/projects/${res.data.id}`);
     } catch (err) {
       console.error(err);
       showToast("Tạo dự án thất bại");
@@ -195,7 +204,7 @@ Some teams assume daily meetings alone are enough to control project uncertainty
       setProjects(activeProjects);
 
       if (activeProjects.length > 0) {
-        navigate(`/student/workspace/${activeProjects[0].id}`);
+        navigate(`/student/projects/${activeProjects[0].id}`);
       } else {
         setProject(null);
         setSources([]);
@@ -205,7 +214,7 @@ Some teams assume daily meetings alone are enough to control project uncertainty
         setGraphData(null);
         setCodeContent('');
         setSelectedPaper(null);
-        navigate('/student/workspace');
+        navigate('/student/projects');
       }
     } catch (err) {
       console.error(err);
@@ -488,10 +497,10 @@ Some teams assume daily meetings alone are enough to control project uncertainty
   };
 
   const renderPreview = () => {
-    const titleMatch = codeContent.match(/\\title\{([^}]+)\}/);
-    const authorMatch = codeContent.match(/\\author\{([^}]+)\}/);
+    const titleMatch = displayContent.match(/\\title\{([^}]+)\}/);
+    const authorMatch = displayContent.match(/\\author\{([^}]+)\}/);
 
-    let body = codeContent.replace(/\\documentclass.*?\n/g, '')
+    let body = displayContent.replace(/\\documentclass.*?\n/g, '')
       .replace(/\\usepackage.*?\n/g, '')
       .replace(/\\title\{.*?\}/g, '')
       .replace(/\\author\{.*?\}/g, '')
@@ -635,7 +644,7 @@ Some teams assume daily meetings alone are enough to control project uncertainty
               <div className="flex items-center gap-2">
                 <select
                   value={project?.id || ''}
-                  onChange={(e) => navigate(`/student/workspace/${e.target.value}`)}
+                  onChange={(e) => navigate(`/student/projects/${e.target.value}`)}
                   className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-semibold text-slate-800 outline-none focus:ring-1 focus:ring-indigo-500 max-w-[200px]"
                 >
                   {projects.map((p) => (
@@ -647,7 +656,7 @@ Some teams assume daily meetings alone are enough to control project uncertainty
                 <button
                   onClick={handleCreateProject}
                   className="p-1 hover:bg-slate-100 rounded text-slate-500 transition-colors"
-                  title="Create New Project"
+                  title={UI_TEXT[language].newProject}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
@@ -656,24 +665,24 @@ Some teams assume daily meetings alone are enough to control project uncertainty
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-slate-500">No projects found.</span>
+                <span className="text-xs font-semibold text-slate-500">{UI_TEXT[language].noProjects}</span>
                 <button
                   onClick={handleCreateProject}
                   className="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold rounded transition-colors"
                 >
-                  + Create Project
+                  {UI_TEXT[language].createProject}
                 </button>
               </div>
             )}
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <div className="hidden md:block text-xs text-slate-400 mr-2 font-medium">Student workspace with returned Instructor feedback</div>
+          <div className="hidden md:block text-xs text-slate-400 mr-2 font-medium">{UI_TEXT[language].workspaceDescription}</div>
           <div className="flex gap-1.5 bg-rose-50 border border-rose-100 rounded-full px-1 py-1">
-            <span className="text-[11px] px-2 py-0.5 text-rose-700 font-semibold rounded-full bg-white shadow-sm">Returned with Feedback</span>
+            <span className="text-[11px] px-2 py-0.5 text-rose-700 font-semibold rounded-full bg-white shadow-sm">{UI_TEXT[language].returnedWithFeedback}</span>
             <span className="text-[11px] px-2 py-0.5 text-rose-700 font-semibold rounded-full bg-white shadow-sm flex items-center gap-1">
               <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></div>
-              {feedbacks.length} feedbacks
+              {feedbacks.length} {UI_TEXT[language].feedbacks}
             </span>
           </div>
           <button
@@ -682,7 +691,7 @@ Some teams assume daily meetings alone are enough to control project uncertainty
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            History
+            {UI_TEXT[language].history}
           </button>
           <button
             onClick={() => setShowReviseModal(true)}
@@ -690,13 +699,20 @@ Some teams assume daily meetings alone are enough to control project uncertainty
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            Revise
+            {UI_TEXT[language].revise}
+          </button>
+          <button
+            onClick={toggleLanguage}
+            className="text-xs font-semibold text-slate-600 border border-slate-200 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 transition-all ml-1"
+            title={language === 'vi' ? 'Switch to English' : 'Chuyển sang Tiếng Việt'}
+          >
+            {language === 'vi' ? 'EN' : 'VI'}
           </button>
           <button
             onClick={() => { logout(); navigate('/'); }}
             className="text-xs font-medium text-slate-500 hover:text-red-600 border border-slate-200 px-3 py-1.5 rounded-lg hover:border-red-200 hover:bg-red-50 transition-all ml-1"
           >
-            Sign Out
+            {UI_TEXT[language].signOut}
           </button>
         </div>
       </header>
@@ -726,7 +742,7 @@ Some teams assume daily meetings alone are enough to control project uncertainty
         <aside className="w-64 bg-slate-50/50 border-r border-slate-200 flex flex-col shrink-0 z-10 backdrop-blur-sm">
           {/* Section 1: Paper Drafts */}
           <div className="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-slate-100/40">
-            <span className="text-[11px] font-bold text-slate-500 tracking-wider uppercase">Bản nháp bài viết (Papers)</span>
+            <span className="text-[11px] font-bold text-slate-500 tracking-wider uppercase">{UI_TEXT[language].paperDrafts}</span>
             <label className="text-slate-400 hover:text-indigo-600 transition-colors cursor-pointer" title="Tải lên bản nháp mới">
               <input
                 type="file"
@@ -776,7 +792,7 @@ Some teams assume daily meetings alone are enough to control project uncertainty
 
           {/* Section 2: Uploaded Sources */}
           <div className="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-slate-100/40">
-            <span className="text-[11px] font-bold text-slate-500 tracking-wider uppercase">Tài liệu tham khảo (Sources)</span>
+            <span className="text-[11px] font-bold text-slate-500 tracking-wider uppercase">{UI_TEXT[language].sources}</span>
             <label className="text-slate-400 hover:text-indigo-600 transition-colors cursor-pointer" title="Tải lên tài liệu mới">
               <input
                 type="file"
@@ -842,7 +858,7 @@ Some teams assume daily meetings alone are enough to control project uncertainty
                 {selectedPaper ? (
                   <span className="text-[11px] text-slate-400 italic truncate max-w-[200px]">Đang xem: {selectedPaper.originalFilename}</span>
                 ) : (
-                  <span className="text-[11px] text-rose-500 font-medium">Chưa chọn bản nháp bài viết</span>
+                  <span className="text-[11px] text-amber-600 font-medium">{UI_TEXT[language].sampleDocument}</span>
                 )}
               </div>
               <div className="flex items-center gap-3 text-xs font-medium text-slate-500">
@@ -853,7 +869,7 @@ Some teams assume daily meetings alone are enough to control project uncertainty
                     title="AI Review cấu trúc và định dạng của paper"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 01-2 2h0a2 2 0 01-2-2v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
-                    AI Review
+                    {UI_TEXT[language].aiReview}
                   </button>
                 )}
                 <div className="flex bg-slate-100 rounded-lg p-0.5 border border-slate-200">
@@ -874,7 +890,7 @@ Some teams assume daily meetings alone are enough to control project uncertainty
             {editorMode === 'Code' ? (
               <div className="relative flex-1 bg-[#0d1117] overflow-hidden group">
                 <textarea
-                  value={codeContent}
+                  value={displayContent}
                   onChange={(e) => setCodeContent(e.target.value)}
                   onScroll={(e) => {
                     if (preRef.current) {
@@ -890,7 +906,7 @@ Some teams assume daily meetings alone are enough to control project uncertainty
                   className="absolute inset-0 w-full h-full pointer-events-none text-slate-300 m-0 border-0 font-mono text-sm p-5 whitespace-pre-wrap break-words leading-relaxed overflow-auto custom-scrollbar"
                   aria-hidden="true"
                 >
-                  {codeContent.split(/(\\[a-zA-Z]+|\{[^{}]*\})/g).map((part, j) => {
+                  {displayContent.split(/(\\[a-zA-Z]+|\{[^{}]*\})/g).map((part, j) => {
                     if (!part) return null;
                     if (part.startsWith('\\')) return <span key={j} className="text-[#ff7b72]">{part}</span>;
                     if (part.startsWith('{') && part.endsWith('}')) {
@@ -906,7 +922,7 @@ Some teams assume daily meetings alone are enough to control project uncertainty
               </div>
             ) : (
               <RichTextEditor
-                initialHtml={generateRichTextHtml(codeContent)}
+                initialHtml={generateRichTextHtml(displayContent)}
                 onHtmlChange={(target) => {
                   const newCode = parseHtmlToLatex(target);
                   setCodeContent(newCode);
@@ -940,14 +956,14 @@ Some teams assume daily meetings alone are enough to control project uncertainty
               onClick={() => setActiveTab('Source')}
               className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider flex flex-col justify-center items-center gap-1 transition-all relative ${activeTab === 'Source' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              Thông tin
+              {UI_TEXT[language].tabInfo}
               {activeTab === 'Source' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 shadow-[0_-2px_8px_rgba(79,70,229,0.5)]"></div>}
             </button>
             <button
               onClick={() => setActiveTab('Claims')}
               className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider flex flex-col justify-center items-center gap-1 transition-all relative ${activeTab === 'Claims' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
-              Luận điểm
+              {UI_TEXT[language].tabClaims}
               {activeTab === 'Claims' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 shadow-[0_-2px_8px_rgba(79,70,229,0.5)]"></div>}
             </button>
             <button
@@ -959,14 +975,14 @@ Some teams assume daily meetings alone are enough to control project uncertainty
                   <span className="absolute -top-1.5 -right-2 bg-rose-500 text-white flex items-center justify-center text-[9px] w-4 h-4 rounded-full font-bold animate-pulse">{feedbacks.length}</span>
                 )}
               </div>
-              Nhận xét
+              {UI_TEXT[language].tabFeedback}
               {activeTab === 'Feedback' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 shadow-[0_-2px_8px_rgba(79,70,229,0.5)]"></div>}
             </button>
             <button
               onClick={() => setActiveTab('Graph')}
               className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider flex flex-col justify-center items-center gap-1 transition-all relative ${activeTab === 'Graph' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
-              Đồ thị
+              {UI_TEXT[language].tabGraph}
               {activeTab === 'Graph' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 shadow-[0_-2px_8px_rgba(79,70,229,0.5)]"></div>}
             </button>
           </div>

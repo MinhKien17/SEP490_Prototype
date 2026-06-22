@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { LanguageProvider } from './context/LanguageContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Home from './pages/Home.jsx';
 import Login from './pages/Login.jsx';
@@ -17,7 +18,8 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
+        <LanguageProvider>
+          <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
@@ -44,7 +46,8 @@ function App() {
           <Route path="/student/projects/:projectId" element={
             <ProtectedRoute allowedRoles={['STUDENT']}><Workspace /></ProtectedRoute>
           } />
-        </Routes>
+          </Routes>
+        </LanguageProvider>
       </AuthProvider>
     </BrowserRouter>
   );
