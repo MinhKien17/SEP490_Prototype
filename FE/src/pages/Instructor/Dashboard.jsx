@@ -1,12 +1,9 @@
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    navigate('/');
-  };
+  const { logout } = useAuth();
 
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
@@ -30,7 +27,7 @@ export default function Dashboard() {
               <span className="text-xs font-semibold text-blue-50 tracking-wide uppercase">Instructor Mode</span>
             </div>
             <button 
-              onClick={handleLogout}
+              onClick={() => { logout(); navigate('/'); }}
               className="text-sm font-medium text-blue-200 hover:text-white transition"
             >
               Sign Out
@@ -130,7 +127,7 @@ export default function Dashboard() {
 
           {/* Manage Dataset Card */}
           <Link 
-            to="/instructor/dataset" 
+            to="/instructor/datasets" 
             className="group bg-white p-6 rounded border border-gray-200 shadow-sm hover:shadow-md transition-all text-left flex flex-col justify-between"
           >
             <div>

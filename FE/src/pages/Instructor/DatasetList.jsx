@@ -1,20 +1,25 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../../api.js'; 
+import { useAuth } from '../../context/AuthContext';
+import FileViewerModal from '../../components/FileViewerModal';
+import api from '../../api.js';
 
 export default function DatasetList() {
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const [datasets, setDatasets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   const [expandedDatasetId, setExpandedDatasetId] = useState(null);
   const [datasetSources, setDatasetSources] = useState({});
   const [loadingSources, setLoadingSources] = useState(false);
 
-  // --- STATE PHỤC VỤ TÍNH NĂNG UPDATE ---
+  const [viewerFile, setViewerFile] = useState(null);
+
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [editingDatasetId, setEditingDatasetId] = useState(null);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
@@ -132,14 +137,16 @@ export default function DatasetList() {
 
       // 2. Nếu chọn đính kèm thêm file mới thì tiến hành upload
       if (selectedFile) {
+        setIsUploading(true);
         const formData = new FormData();
         formData.append('file', selectedFile);
 
-        await api.post(`/api/datasets/${editingDatasetId}/sources`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-        
-        await fetchSources(editingDatasetId);
+        try {
+          await api.post(`/api/datasets/${editingDatasetId}/sources`, formData);
+          await fetchSources(editingDatasetId);
+        } finally {
+          setIsUploading(false);
+        }
       }
 
       setDatasets(prev => prev.map(d => 
@@ -156,41 +163,16 @@ export default function DatasetList() {
     }
   };
 
-  // XỬ LÝ XEM FILE PDF CÓ ĐÍNH KÈM TOKEN ĐĂNG NHẬP
-  const handleViewFile = async (e, datasetId, fileId, fileName) => {
-    e.stopPropagation(); 
-    try {
-      const token = localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('jwt');
-      const headers = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await api.get(`/api/datasets/${datasetId}/sources/${fileId}`, {
-        responseType: 'blob',
-        headers: headers 
-      });
-
-      const fileBlob = new Blob([response.data], { type: 'application/pdf' });
-      const fileUrl = URL.createObjectURL(fileBlob);
-
-      const newTab = window.open();
-      if (newTab) {
-        newTab.location.href = fileUrl;
-      } else {
-        const link = document.createElement('a');
-        link.href = fileUrl;
-        link.download = fileName || 'document.pdf';
-        link.click();
-      }
-    } catch (err) {
-      console.error('Failed to open PDF file:', err);
-      alert('Không thể mở file PDF này. Hãy kiểm tra lại kết nối hoặc quyền truy cập.');
+  // SỬ DỤNG FILEVIEWERMODAL ĐỂ XEM FILE PDF TRỰC TIẾP QUA FILEURL
+  const handleViewFile = (e, fileUrl, fileName) => {
+    e.stopPropagation();
+    if (fileUrl) {
+      setViewerFile({ fileUrl, fileName: fileName || 'document' });
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#fcfcfc] font-sans text-[#333333]">
+    <div className="min-h-screen bg-[#fcfcfc] font-sans text-[#333333] relative">
       
       {/* HEADER SECTION */}
       <header className="bg-[#1e3a8a] text-white border-b border-[#152e75] sticky top-0 z-10 shadow-sm">
@@ -204,6 +186,12 @@ export default function DatasetList() {
               className="text-sm font-medium text-blue-200 hover:text-white transition"
             >
               Back to Dashboard
+            </button>
+            <button 
+              onClick={() => { logout(); navigate('/'); }}
+              className="text-sm font-medium text-blue-200 hover:text-white transition"
+            >
+              Sign Out
             </button>
           </div>
         </div>
@@ -219,7 +207,7 @@ export default function DatasetList() {
             <p className="text-sm text-gray-500 mt-1">Manage and view your teaching resource files</p>
           </div>
           <button
-            onClick={() => navigate('/instructor/dataset/create')} 
+            onClick={() => navigate('/instructor/dataset')} 
             className="px-5 py-2.5 bg-[#1e3a8a] text-white rounded font-semibold hover:bg-[#152e75] transition shadow flex items-center space-x-2 text-sm"
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
@@ -329,9 +317,9 @@ export default function DatasetList() {
                                       <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
                                     </svg>
                                     <div className="truncate flex-1">
-                                      <button 
+                                      <button
                                         type="button"
-                                        onClick={(e) => handleViewFile(e, dataset.id, file.id, currentFileName)}
+                                        onClick={(e) => handleViewFile(e, file.fileUrl, currentFileName)}
                                         className="font-semibold text-gray-700 hover:text-blue-600 hover:underline block truncate text-left w-full focus:outline-none"
                                         title="Click to view file"
                                       >
@@ -454,6 +442,22 @@ export default function DatasetList() {
         </div>
       )}
 
+      {isUploading && (
+        <div className="absolute inset-0 bg-white/60 flex items-center justify-center z-10">
+          <div className="flex items-center gap-2 text-sm font-medium text-gray-600 bg-white px-4 py-2 rounded-lg shadow-sm border border-gray-200">
+            <div className="animate-spin w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full"></div>
+            Uploading file...
+          </div>
+        </div>
+      )}
+
+      {viewerFile && (
+        <FileViewerModal
+          fileUrl={viewerFile.fileUrl}
+          fileName={viewerFile.fileName}
+          onClose={() => setViewerFile(null)}
+        />
+      )}
     </div>
   );
 }

@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import api from '../api.js';
 
 export default function Profile() {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   
@@ -57,6 +61,14 @@ export default function Profile() {
 
   return (
     <div className="max-w-2xl mx-auto p-6 mt-10 bg-white rounded-xl shadow-md">
+      <div className="flex justify-end mb-4">
+        <button
+          onClick={() => { logout(); navigate('/'); }}
+          className="px-4 py-2 bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition font-medium text-sm"
+        >
+          Sign Out
+        </button>
+      </div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">Personal Information</h2>
         {!isEditing && (

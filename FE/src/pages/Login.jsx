@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import api from '../api.js';
 
 export default function Login() {
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const [form, setForm] = useState({ email: '', passwordHash: '' });
   const [error, setError] = useState('');
@@ -28,15 +30,12 @@ export default function Login() {
 
       if (!token) throw new Error('Token not found in response');
 
-      localStorage.setItem('token', token);
-      if (role) {
-        localStorage.setItem('role', role);
-      }
-      
+      login(token, role);
+
       if (role === 'INSTRUCTOR') {
-        navigate('/instructor/requests');
+        navigate('/instructor/dashboard');
       } else {
-        navigate('/student/workspace');
+        navigate('/student/projects');
       }
     } catch (err) {
       const msg = err.response?.data?.message

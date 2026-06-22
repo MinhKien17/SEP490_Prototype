@@ -1,30 +1,51 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
 import Home from './pages/Home.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
 
-// BƯỚC 1: Import các trang mà bạn vừa làm vào đây
 import Profile from './pages/Profile.jsx';
 import ReviewRequests from './pages/Instructor/ReviewRequests.jsx';
 import CreateDataset from './pages/Instructor/CreateDataset.jsx';
+import DatasetList from './pages/Instructor/DatasetList.jsx';
+import InstructorDashboard from './pages/Instructor/Dashboard.jsx';
+import StudentProjects from './pages/Student/Projects.jsx';
 import Workspace from './pages/Student/Workspace.jsx';
 
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+      <AuthProvider>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
 
-        {/* BƯỚC 2: Khai báo các tuyến đường mới để hết bị trắng trang */}
-        <Route path="/profile" element={<Profile />} />
-        
-        {/* Hãy chú ý gõ chính xác chữ thường khớp với URL trên trình duyệt nhé */}
-        <Route path="/instructor/requests" element={<ReviewRequests />} />
-        <Route path="/instructor/dataset" element={<CreateDataset />} />
-        <Route path="/student/workspace/:projectId?" element={<Workspace />} />
-      </Routes>
+          <Route path="/profile" element={
+            <ProtectedRoute><Profile /></ProtectedRoute>
+          } />
+
+          <Route path="/instructor/dashboard" element={
+            <ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN']}><InstructorDashboard /></ProtectedRoute>
+          } />
+          <Route path="/instructor/requests" element={
+            <ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN']}><ReviewRequests /></ProtectedRoute>
+          } />
+          <Route path="/instructor/dataset" element={
+            <ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN']}><CreateDataset /></ProtectedRoute>
+          } />
+          <Route path="/instructor/datasets" element={
+            <ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN']}><DatasetList /></ProtectedRoute>
+          } />
+          <Route path="/student/projects" element={
+            <ProtectedRoute allowedRoles={['STUDENT']}><StudentProjects /></ProtectedRoute>
+          } />
+          <Route path="/student/projects/:projectId" element={
+            <ProtectedRoute allowedRoles={['STUDENT']}><Workspace /></ProtectedRoute>
+          } />
+        </Routes>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

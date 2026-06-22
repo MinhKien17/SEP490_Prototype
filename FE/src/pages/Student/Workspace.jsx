@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import FileViewerModal from '../../components/FileViewerModal';
 import api from '../../api.js';
 
 const RichTextEditor = React.memo(({ initialHtml, onHtmlChange }) => {
@@ -17,6 +19,7 @@ const RichTextEditor = React.memo(({ initialHtml, onHtmlChange }) => {
 export default function Workspace() {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const { logout, user } = useAuth();
   const [activeTab, setActiveTab] = useState('Source');
   const [editorMode, setEditorMode] = useState('Code');
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -30,6 +33,8 @@ export default function Workspace() {
   const [feedbacks, setFeedbacks] = useState([]);
   const [graphData, setGraphData] = useState(null);
   const [loadingProject, setLoadingProject] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [viewerFile, setViewerFile] = useState(null);
 
   const [codeContent, setCodeContent] = useState(`\\documentclass{article}
 \\usepackage[utf-8]{inputenc}
@@ -300,6 +305,12 @@ Some teams assume daily meetings alone are enough to control project uncertainty
             </svg>
             Revise
           </button>
+          <button
+            onClick={() => { logout(); navigate('/'); }}
+            className="text-xs font-medium text-slate-500 hover:text-red-600 border border-slate-200 px-3 py-1.5 rounded-lg hover:border-red-200 hover:bg-red-50 transition-all ml-1"
+          >
+            Sign Out
+          </button>
         </div>
       </header>
 
@@ -510,42 +521,45 @@ Some teams assume daily meetings alone are enough to control project uncertainty
              {/* SOURCE TAB */}
              {activeTab === 'Source' && (
                <div className="p-5 flex flex-col gap-6 animate-in fade-in duration-300">
-                  <label className="w-full flex justify-center items-center gap-2 border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-indigo-50/50 hover:bg-indigo-50 rounded-xl p-6 transition-all group mb-6 shadow-sm cursor-pointer">
-                    <input 
-                      type="file" 
-                      className="hidden" 
-                      accept=".pdf,.doc,.docx" 
-                      onChange={async (e) => {
-                        if (e.target.files && e.target.files.length > 0) {
-                          const file = e.target.files[0];
-                          showToast(`Uploading ${file.name}...`);
-                          if (!project) {
-                            showToast('No project selected to upload to.');
-                            return;
-                          }
-                          const formData = new FormData();
-                          formData.append('file', file);
-                          formData.append('projectId', project.id);
-                          try {
-                            await api.post('/api/sources/upload', formData, {
-                              headers: { 'Content-Type': 'multipart/form-data' }
-                            });
-                            showToast(`${file.name} uploaded successfully.`);
-                            // Refresh sources
-                            const srcRes = await api.get(`/api/projects/${project.id}/sources`);
-                            setSources(srcRes.data);
-                          } catch (err) {
-                            console.error('Upload failed', err);
-                            showToast(`Failed to upload ${file.name}`);
-                          }
-                        }
-                      }} 
-                    />
-                    <div className="bg-white p-2 rounded-full shadow-sm group-hover:scale-110 transition-transform">
-                      <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                    </div>
-                    <span className="text-sm font-semibold text-indigo-700">Upload PDF / DOCX</span>
-                  </label>
+                   <label className={`w-full flex justify-center items-center gap-2 border-2 border-dashed rounded-xl p-6 transition-all group mb-6 shadow-sm cursor-pointer ${isUploading ? 'border-indigo-300 bg-indigo-100/50 opacity-60 pointer-events-none' : 'border-indigo-200 hover:border-indigo-400 bg-indigo-50/50 hover:bg-indigo-50'}`}>
+                     <input 
+                       type="file" 
+                       className="hidden" 
+                       accept=".pdf,.doc,.docx" 
+                       disabled={isUploading}
+                       onChange={async (e) => {
+                         if (e.target.files && e.target.files.length > 0) {
+                           const file = e.target.files[0];
+                           if (!project) {
+                             showToast('No project selected to upload to.');
+                             return;
+                           }
+                           setIsUploading(true);
+                           const formData = new FormData();
+                           formData.append('file', file);
+                           try {
+                             await api.post(`/api/sources/upload?uploadedBy=${user.id}&projectId=${project.id}`, formData);
+                             showToast(`${file.name} uploaded successfully.`);
+                             const srcRes = await api.get(`/api/projects/${project.id}/sources`);
+                             setSources(srcRes.data);
+                           } catch (err) {
+                             console.error('Upload failed', err);
+                             showToast(`Failed to upload ${file.name}`);
+                           } finally {
+                             setIsUploading(false);
+                           }
+                         }
+                       }} 
+                     />
+                     <div className="bg-white p-2 rounded-full shadow-sm group-hover:scale-110 transition-transform">
+                       {isUploading ? (
+                         <div className="animate-spin w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full"></div>
+                       ) : (
+                         <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                       )}
+                     </div>
+                     <span className="text-sm font-semibold text-indigo-700">{isUploading ? 'Uploading...' : 'Upload PDF / DOCX'}</span>
+                   </label>
 
                   <div>
                      <h3 className="text-[11px] font-bold text-slate-400 tracking-widest mb-3 uppercase flex items-center gap-2">
@@ -584,9 +598,9 @@ Some teams assume daily meetings alone are enough to control project uncertainty
                           <div className="text-sm text-slate-500 italic text-center p-4">No uploaded sources yet.</div>
                         ) : (
                           sources.map(src => (
-                            <div key={src.id} onClick={() => showToast(`Opening source: ${src.originalFilename}`)} className="bg-white border border-slate-200 rounded-xl p-3.5 hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer transform hover:-translate-y-0.5">
-                               <p className="text-sm font-bold text-slate-800 flex items-center gap-2"><svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd"/></svg>{src.originalFilename}</p>
-                               <p className="text-xs text-slate-500 mt-1.5 line-clamp-2 leading-relaxed">Source file uploaded to this project.</p>
+                            <div key={src.id} onClick={() => src.fileUrl ? setViewerFile({ fileUrl: src.fileUrl, fileName: src.originalFilename }) : showToast('File URL not available')} className="bg-white border border-slate-200 rounded-xl p-3.5 hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer transform hover:-translate-y-0.5">
+                                <p className="text-sm font-bold text-slate-800 flex items-center gap-2"><svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd"/></svg>{src.originalFilename}</p>
+                                <p className="text-xs text-slate-500 mt-1.5 line-clamp-2 leading-relaxed">Source file uploaded to this project.</p>
                             </div>
                           ))
                         )}
@@ -828,6 +842,14 @@ Some teams assume daily meetings alone are enough to control project uncertainty
             </div>
           </div>
         </div>
+      )}
+
+      {viewerFile && (
+        <FileViewerModal
+          fileUrl={viewerFile.fileUrl}
+          fileName={viewerFile.fileName}
+          onClose={() => setViewerFile(null)}
+        />
       )}
     </div>
   );

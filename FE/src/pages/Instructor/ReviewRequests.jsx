@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import api from '../../api.js';
 
 export default function ReviewRequests() {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -66,9 +70,23 @@ export default function ReviewRequests() {
           <h2 className="text-2xl font-bold text-gray-800">Review Student Requests</h2>
           {error && <p className="text-amber-600 text-xs mt-1 font-medium">⚠️ {error}</p>}
         </div>
-        <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-semibold">
-          {requests.length} pending
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-semibold">
+            {requests.length} pending
+          </span>
+          <button
+            onClick={() => navigate('/instructor/dashboard')}
+            className="px-4 py-2 bg-gray-50 text-gray-600 rounded-md hover:bg-gray-100 transition font-medium text-sm"
+          >
+            Dashboard
+          </button>
+          <button
+            onClick={() => { logout(); navigate('/'); }}
+            className="px-4 py-2 bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition font-medium text-sm"
+          >
+            Sign Out
+          </button>
+        </div>
       </div>
       
       <div className="overflow-hidden rounded-lg border border-gray-200">

@@ -1,36 +1,34 @@
-import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export default function Home() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [role, setRole] = useState('');
-
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    const savedRole = localStorage.getItem('role');
-    if (token) {
-      setIsLoggedIn(true);
-      setRole(savedRole || '');
-    }
-  }, []);
+  const { isAuthenticated, role, logout } = useAuth();
 
   return (
     <div className="min-h-screen bg-[#fcfcfc] text-[#333333] font-sans flex flex-col">
       {/* 1. Header / Navigation Bar */}
       <header className="bg-[#1e3a8a] text-white px-8 py-3 flex justify-between items-center shadow-sm">
         <div className="flex items-center space-x-3">
-          <span className="text-xl font-bold tracking-wider">Evidence Pilot 🚀</span>
+          <span className="text-xl font-bold tracking-wider">Evidence Pilot</span>
         </div>
         <nav className="space-x-6 flex items-center">
           <a href="#features" className="text-blue-200 hover:text-white font-medium text-sm transition">Features</a>
           <a href="#about" className="text-blue-200 hover:text-white font-medium text-sm transition">About Us</a>
-          {isLoggedIn ? (
-            <Link 
-              to={role === 'INSTRUCTOR' ? '/instructor/requests' : '/student/workspace'} 
-              className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-4 py-1.5 rounded text-sm font-medium transition shadow-sm"
-            >
-              Go to Workspace
-            </Link>
+          {isAuthenticated ? (
+            <>
+              <Link
+                to={role === 'INSTRUCTOR' ? '/instructor/dashboard' : '/student/projects'}
+                className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-4 py-1.5 rounded text-sm font-medium transition shadow-sm"
+              >
+                Go to Workspace
+              </Link>
+              <button
+                onClick={logout}
+                className="text-sm font-medium text-blue-200 hover:text-white transition"
+              >
+                Sign Out
+              </button>
+            </>
           ) : (
             <>
               <Link to="/login" className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-4 py-1.5 rounded text-sm font-medium transition shadow-sm">
@@ -55,9 +53,9 @@ export default function Home() {
             Evidence Pilot is a comprehensive platform for scientific research management, evaluating projects, sources, and claims tailored for both students and instructors.
           </p>
           <div className="pt-4">
-            {isLoggedIn ? (
-              <Link 
-                to={role === 'INSTRUCTOR' ? '/instructor/requests' : '/student/workspace'} 
+            {isAuthenticated ? (
+              <Link
+                to={role === 'INSTRUCTOR' ? '/instructor/dashboard' : '/student/projects'}
                 className="bg-[#1e3a8a] hover:bg-[#1e40af] text-white px-8 py-3.5 rounded text-base font-semibold transition shadow-md inline-block"
               >
                 Go to Workspace
@@ -100,7 +98,7 @@ export default function Home() {
 
       {/* 4. Footer */}
       <footer className="bg-[#0f172a] text-gray-300 py-6 text-center text-xs border-t border-gray-900 mt-auto">
-        © 2026 Evidence Pilot Project. 
+        © 2026 Evidence Pilot Project.
       </footer>
     </div>
   );
