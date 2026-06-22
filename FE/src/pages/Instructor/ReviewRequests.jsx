@@ -145,42 +145,26 @@ export default function ReviewRequests() {
               <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
               <span className="text-xs font-semibold text-indigo-100 tracking-wide uppercase">Giảng Viên</span>
             </div>
-            <button 
-              onClick={() => navigate('/instructor/dashboard')}
-              className="text-sm font-semibold text-indigo-200 hover:text-white transition"
-            >
-              Bảng điều khiển
-            </button>
-            <button 
-              onClick={() => {
-                localStorage.removeItem('token');
-                localStorage.removeItem('role');
-                navigate('/login');
-              }}
-              className="text-sm font-semibold text-rose-300 hover:text-rose-100 transition"
-            >
-              Đăng xuất
-            </button>
+            <div className="flex items-center gap-3">
+              <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-semibold">
+                {requests.length} pending
+              </span>
+              <button
+                onClick={() => navigate('/instructor/dashboard')}
+                className="px-4 py-2 bg-gray-50 text-gray-600 rounded-md hover:bg-gray-100 transition font-medium text-sm"
+              >
+                Dashboard
+              </button>
+              <button
+                onClick={() => { logout(); navigate('/'); }}
+                className="px-4 py-2 bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition font-medium text-sm"
+              >
+                Sign Out
+              </button>
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-semibold">
-            {requests.length} pending
-          </span>
-          <button
-            onClick={() => navigate('/instructor/dashboard')}
-            className="px-4 py-2 bg-gray-50 text-gray-600 rounded-md hover:bg-gray-100 transition font-medium text-sm"
-          >
-            Dashboard
-          </button>
-          <button
-            onClick={() => { logout(); navigate('/'); }}
-            className="px-4 py-2 bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition font-medium text-sm"
-          >
-            Sign Out
-          </button>
-        </div>
-      </div>
+      </header>
       
       <div className="overflow-hidden rounded-lg border border-gray-200">
         <table className="w-full text-left border-collapse bg-white">

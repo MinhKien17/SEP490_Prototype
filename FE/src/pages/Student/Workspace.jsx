@@ -1066,6 +1066,7 @@ Some teams assume daily meetings alone are enough to control project uncertainty
             )}
 
             {/* Danh sách Claims */}
+            {activeTab === 'Claims' && (
             <div className="space-y-3">
               {claims.length === 0 ? (
                 <div className="text-xs text-slate-400 italic text-center py-8">Dự án này chưa có luận điểm nào. Hãy thêm ở trên.</div>
@@ -1152,8 +1153,7 @@ Some teams assume daily meetings alone are enough to control project uncertainty
                 })
               )}
             </div>
-          </div>
-             )}
+            )}
 
           {/* 3. FEEDBACK TAB (Nhận xét của Instructor) */}
           {activeTab === 'Feedback' && (
@@ -1297,7 +1297,7 @@ Some teams assume daily meetings alone are enough to control project uncertainty
 
       </div>
     </aside>
-      </div >
+      </div>
 
     {/* HISTORY MODAL */ }
   {
