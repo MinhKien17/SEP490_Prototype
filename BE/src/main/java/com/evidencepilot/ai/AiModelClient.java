@@ -34,10 +34,7 @@ public class AiModelClient {
     public AiModelClient(@Qualifier("aiRestClient") RestClient restClient,
                          @Qualifier("aiModelBaseUrl") String baseUrl) {
         this.restClient = restClient;
-        if (baseUrl == null || baseUrl.isBlank()) {
-            throw new IllegalArgumentException("AI model base URL must be configured");
-        }
-        this.baseUrl = trimTrailingSlash(baseUrl);
+        this.baseUrl = baseUrl == null || baseUrl.isBlank() ? "" : trimTrailingSlash(baseUrl);
     }
 
     // ── Liveness ───────────────────────────────────────────────────────────────
@@ -215,20 +212,20 @@ public class AiModelClient {
      * Wraps the endpoint path and status code for clear error messages.
      */
     private <T> T call(String endpoint, AiCall<T> call) {
+        if (baseUrl.isBlank()) {
+            throw new AiApiException(endpoint, 503, "AI_MODEL_BASE_URL is not configured", null);
+        }
         try {
             return call.execute();
         } catch (AiApiException e) {
             throw e;
         } catch (RestClientException e) {
             log.warn("AI endpoint {} failed at configured base URL {}.", endpoint, baseUrl, e);
-            throw new AiApiException(endpoint, "AI model offline at " + baseUrl, e);
+            throw new AiApiException(endpoint, 503, "AI model offline at " + baseUrl, e);
         }
     }
 
     private AiApiException statusException(String operation, int statusCode) {
-        if (statusCode >= 500) {
-            return new AiApiException(operation, "AI model offline at " + baseUrl + " - HTTP " + statusCode, null);
-        }
         return new AiApiException(operation, statusCode);
     }
 
@@ -249,7 +246,7 @@ public class AiModelClient {
     }
 
     /**
-     * Thrown when the AI API returns a non-2xx status or all configured base URLs fail.
+     * Thrown when the AI API returns a non-2xx status or the configured base URL is unavailable.
      */
     public static final class AiApiException extends RuntimeException {
         private final int statusCode;
@@ -260,6 +257,11 @@ public class AiModelClient {
 
         public AiApiException(String endpoint, int statusCode, Throwable cause) {
             super("AI API error on " + endpoint + " - HTTP " + statusCode, cause);
+            this.statusCode = statusCode;
+        }
+
+        public AiApiException(String endpoint, int statusCode, String message, Throwable cause) {
+            super("AI API error on " + endpoint + " - " + message, cause);
             this.statusCode = statusCode;
         }
 

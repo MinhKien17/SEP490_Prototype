@@ -10,65 +10,158 @@ export default function ReviewRequests() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // 1. Gọi API lấy danh sách feedback requests thật từ Backend
-  useEffect(() => {
-    api.get('/api/feedback-requests')
-      .then((res) => {
-        // Lọc hiển thị những request có status là PENDING trên UI giảng viên
-        const pendingRequests = res.data.filter(req => req.status === 'PENDING');
-        setRequests(pendingRequests);
-      })
-      .catch((err) => {
-        console.error('Failed to fetch feedback requests from BE:', err);
-        setError('Could not connect to the server. Using temporary mock data.');
-        
-        // MOCK DATA: Chạy dự phòng nếu server ngrok chưa bật endpoint này
-        setRequests([
-          {
-            id: 1,
-            project: { name: 'Library Management System' },
-            student: { firstName: 'John', lastName: 'Doe' },
-            requestedAt: '2026-06-18T10:30:00',
-            status: 'PENDING'
-          },
-          {
-            id: 2,
-            project: { name: 'Fast Food Delivery App' },
-            student: { firstName: 'Alice', lastName: 'Smith' },
-            requestedAt: '2026-06-19T14:15:00',
-            status: 'PENDING'
+  // States cho modal kiểm chứng chi tiết (Audit / Review)
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [auditDetails, setAuditDetails] = useState(null);
+  const [loadingAudit, setLoadingAudit] = useState(false);
+  const [feedbackComment, setFeedbackComment] = useState('');
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+
+  // 1. Tải danh sách các feedback requests và lấy tên dự án thực tế
+  const fetchRequests = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const res = await api.get('/api/feedback-requests');
+      // Lọc các yêu cầu đang chờ duyệt (status: PENDING)
+      const pendingRequests = (res.data || []).filter(req => req.status === 'PENDING');
+
+      // Với mỗi yêu cầu, gọi API export để lấy tên dự án thực tế
+      const requestsWithDetails = await Promise.all(
+        pendingRequests.map(async (req) => {
+          try {
+            const exportRes = await api.get(`/api/projects/${req.projectId}/traceability-export`);
+            return {
+              ...req,
+              projectTitle: exportRes.data.projectTitle || `Dự án ID: ${req.projectId}`,
+              projectStatus: exportRes.data.projectStatus
+            };
+          } catch (err) {
+            console.error(`Failed to fetch project title for ${req.projectId}`, err);
+            return {
+              ...req,
+              projectTitle: `Dự án ID: ${req.projectId}`
+            };
           }
-        ]);
-      })
-      .finally(() => setLoading(false));
-  }, []);
+        })
+      );
 
-  // 2. Xử lý Approve (Reviewed) hoặc Reject theo đúng endpoint Java của BE
-  const handleReview = (id, action) => {
-    const endpoint = action === 'APPROVED' 
-      ? `/api/feedback-requests/${id}/reviewed` 
-      : `/api/feedback-requests/${id}/rejected`;
-
-    api.post(endpoint)
-      .then(() => {
-        alert(`Request ID ${id} has been successfully ${action.toLowerCase()}!`);
-        // Xóa request vừa duyệt khỏi danh sách hiển thị trên UI
-        setRequests(requests.filter(req => req.id !== id));
-      })
-      .catch((err) => {
-        console.error(`Error processing ${action}:`, err);
-        alert('Action failed. The server endpoint might not be ready yet.');
-      });
+      setRequests(requestsWithDetails);
+    } catch (err) {
+      console.error('Failed to fetch feedback requests:', err);
+      setError('Không thể kết nối đến máy chủ Backend để lấy danh sách yêu cầu.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (loading) return <div className="p-10 text-center text-gray-500 font-medium mt-10">Loading requests list...</div>;
+  useEffect(() => {
+    fetchRequests();
+  }, []);
+
+  // 2. Mở Modal đánh giá dự án
+  const handleOpenAudit = async (req) => {
+    setSelectedRequest(req);
+    setFeedbackComment('');
+    setAuditDetails(null);
+    setLoadingAudit(true);
+    try {
+      const exportRes = await api.get(`/api/projects/${req.projectId}/traceability-export`);
+      setAuditDetails(exportRes.data);
+    } catch (err) {
+      console.error('Failed to fetch traceability details for audit:', err);
+      showToast('Không thể tải thông tin kiểm chứng của dự án này.');
+    } finally {
+      setLoadingAudit(false);
+    }
+  };
+
+  // 3. Thực hiện lưu feedback và chuyển đổi trạng thái duyệt dự án
+  const handleReviewAction = async (actionType) => {
+    if (!selectedRequest) return;
+
+    // Nếu chuyển trả về hoặc từ chối, yêu cầu giảng viên phải ghi nhận xét
+    if ((actionType === 'RETURNED' || actionType === 'REJECTED') && !feedbackComment.trim()) {
+      alert('Vui lòng nhập nhận xét/lý do trả lại hoặc từ chối dự án này.');
+      return;
+    }
+
+    try {
+      setSubmittingFeedback(true);
+
+      // Bước A: Gửi feedback comment nếu có nội dung nhận xét
+      if (feedbackComment.trim()) {
+        await api.post(`/api/feedback-requests/${selectedRequest.id}/feedback`, {
+          content: feedbackComment.trim()
+        });
+      }
+
+      // Bước B: Gọi API chuyển đổi trạng thái của yêu cầu
+      let endpoint = '';
+      let actionLabel = '';
+      if (actionType === 'APPROVED') {
+        endpoint = `/api/feedback-requests/${selectedRequest.id}/reviewed`;
+        actionLabel = 'phê duyệt thành công';
+      } else if (actionType === 'REJECTED') {
+        endpoint = `/api/feedback-requests/${selectedRequest.id}/rejected`;
+        actionLabel = 'từ chối';
+      } else if (actionType === 'RETURNED') {
+        endpoint = `/api/feedback-requests/${selectedRequest.id}/return-to-active`;
+        actionLabel = 'trả lại để chỉnh sửa';
+      }
+
+      await api.post(endpoint);
+      showToast(`Yêu cầu của dự án đã được ${actionLabel}!`);
+
+      // Đóng modal và tải lại danh sách
+      setSelectedRequest(null);
+      setAuditDetails(null);
+      await fetchRequests();
+    } catch (err) {
+      console.error(`Failed to execute review action ${actionType}:`, err);
+      alert('Thao tác phê duyệt thất bại. Vui lòng kiểm tra lại quyền truy cập.');
+    } finally {
+      setSubmittingFeedback(false);
+    }
+  };
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(''), 3000);
+  };
 
   return (
-    <div className="max-w-6xl mx-auto p-6 mt-10 bg-white rounded-xl shadow-md border border-gray-100">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800">Review Student Requests</h2>
-          {error && <p className="text-amber-600 text-xs mt-1 font-medium">⚠️ {error}</p>}
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 antialiased">
+      {/* Header */}
+      <header className="bg-indigo-900 text-white border-b border-indigo-950 sticky top-0 z-30 shadow-md">
+        <div className="w-full px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => navigate('/instructor/dashboard')}>
+            <div className="w-7 h-7 bg-white text-indigo-900 rounded-md text-xs flex items-center justify-center font-black shadow-sm">EP</div>
+            <span className="font-bold text-xl tracking-wider">Evidence Pilot</span>
+          </div>
+          <div className="flex items-center space-x-6">
+            <div className="flex items-center space-x-2 bg-white/10 px-3 py-1.5 rounded border border-white/20">
+              <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
+              <span className="text-xs font-semibold text-indigo-100 tracking-wide uppercase">Giảng Viên</span>
+            </div>
+            <button 
+              onClick={() => navigate('/instructor/dashboard')}
+              className="text-sm font-semibold text-indigo-200 hover:text-white transition"
+            >
+              Bảng điều khiển
+            </button>
+            <button 
+              onClick={() => {
+                localStorage.removeItem('token');
+                localStorage.removeItem('role');
+                navigate('/login');
+              }}
+              className="text-sm font-semibold text-rose-300 hover:text-rose-100 transition"
+            >
+              Đăng xuất
+            </button>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-semibold">
@@ -146,6 +239,6 @@ export default function ReviewRequests() {
           </tbody>
         </table>
       </div>
-    </div>
+    </div >
   );
 }
