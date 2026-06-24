@@ -1,7 +1,7 @@
 package com.evidencepilot.dto.response;
 
-import com.evidencepilot.domain.entity.FeedbackRequest;
-import com.evidencepilot.domain.enums.FeedbackStatus;
+import com.evidencepilot.model.FeedbackRequest;
+import com.evidencepilot.model.FeedbackStatus;
 import java.time.LocalDateTime;
 
 public record FeedbackRequestResponseDto(

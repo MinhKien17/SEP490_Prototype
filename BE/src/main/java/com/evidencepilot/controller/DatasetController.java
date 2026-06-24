@@ -1,11 +1,11 @@
 package com.evidencepilot.controller;
 
-import com.evidencepilot.ai.AiModelClient;
-import com.evidencepilot.domain.entity.Dataset;
-import com.evidencepilot.domain.entity.Source;
-import com.evidencepilot.domain.entity.SourceChunk;
-import com.evidencepilot.domain.entity.User;
-import com.evidencepilot.domain.enums.UserRole;
+import com.evidencepilot.client.ai.AiModelClient;
+import com.evidencepilot.model.Dataset;
+import com.evidencepilot.model.Source;
+import com.evidencepilot.model.SourceChunk;
+import com.evidencepilot.model.User;
+import com.evidencepilot.model.UserRole;
 import com.evidencepilot.dto.response.DatasetGraphResponseDto;
 import com.evidencepilot.dto.response.DatasetResponseDto;
 import com.evidencepilot.dto.response.DatasetSimilarityResponseDto;
@@ -17,8 +17,8 @@ import com.evidencepilot.repository.SourceChunkRepository;
 import com.evidencepilot.repository.SourceRepository;
 import com.evidencepilot.repository.UserRepository;
 import com.evidencepilot.service.CurrentUserService;
-import com.evidencepilot.service.QdrantClient;
-import com.evidencepilot.service.QdrantSearchResult;
+import com.evidencepilot.client.qdrant.QdrantClient;
+import com.evidencepilot.client.qdrant.QdrantSearchResult;
 import com.evidencepilot.service.SourceExtractionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

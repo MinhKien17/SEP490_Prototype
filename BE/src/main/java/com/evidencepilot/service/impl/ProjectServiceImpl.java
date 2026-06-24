@@ -1,7 +1,7 @@
 package com.evidencepilot.service.impl;
 
-import com.evidencepilot.domain.entity.Project;
-import com.evidencepilot.domain.enums.ProjectStatus;
+import com.evidencepilot.model.Project;
+import com.evidencepilot.model.ProjectStatus;
 import com.evidencepilot.dto.request.ProjectCreateRequest;
 import com.evidencepilot.dto.request.ProjectUpdateRequest;
 import com.evidencepilot.dto.response.ProjectResponse;

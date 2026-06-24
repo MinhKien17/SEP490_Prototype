@@ -1,8 +1,8 @@
 package com.evidencepilot.controller;
 
-import com.evidencepilot.config.JwtUtil;
-import com.evidencepilot.domain.entity.User;
-import com.evidencepilot.domain.enums.UserRole;
+import com.evidencepilot.config.security.JwtUtil;
+import com.evidencepilot.model.User;
+import com.evidencepilot.model.UserRole;
 import com.evidencepilot.dto.request.LoginRequest;
 import com.evidencepilot.dto.request.RegisterRequest;
 import com.evidencepilot.repository.UserRepository;
@@ -23,8 +23,7 @@ class AuthControllerTest {
 
     private final UserRepository userRepository = mock(UserRepository.class);
     private final JwtUtil jwtUtil = new JwtUtil("EvidencePilot-Test-Secret-Key-For-Jwt!!", 86_400_000L);
-    private final AuthController controller =
-            new AuthController(userRepository, new BCryptPasswordEncoder(), jwtUtil);
+    private final AuthController controller = new AuthController(userRepository, new BCryptPasswordEncoder(), jwtUtil);
 
     @Test
     void registerCreatesRequestedRoleAndDoesNotExposePasswordHash() {

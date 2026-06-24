@@ -1,10 +1,10 @@
 package com.evidencepilot.controller;
 
-import com.evidencepilot.ai.dto.PaperReviewResponse;
-import com.evidencepilot.domain.entity.Paper;
-import com.evidencepilot.domain.entity.PaperSection;
-import com.evidencepilot.domain.entity.Project;
-import com.evidencepilot.domain.entity.User;
+import com.evidencepilot.dto.response.PaperReviewResponse;
+import com.evidencepilot.model.Paper;
+import com.evidencepilot.model.PaperSection;
+import com.evidencepilot.model.Project;
+import com.evidencepilot.model.User;
 import com.evidencepilot.dto.response.PaperResponseDto;
 import com.evidencepilot.dto.response.PaperSectionResponseDto;
 import com.evidencepilot.repository.PaperRepository;

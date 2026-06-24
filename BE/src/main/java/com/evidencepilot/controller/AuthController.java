@@ -1,7 +1,7 @@
 package com.evidencepilot.controller;
 
-import com.evidencepilot.config.JwtUtil;
-import com.evidencepilot.domain.entity.User;
+import com.evidencepilot.config.security.JwtUtil;
+import com.evidencepilot.model.User;
 import com.evidencepilot.dto.request.LoginRequest;
 import com.evidencepilot.dto.request.RegisterRequest;
 import com.evidencepilot.dto.request.UpdatePasswordRequest;

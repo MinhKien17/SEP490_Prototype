@@ -1,6 +1,6 @@
 package com.evidencepilot.dto.response;
 
-import com.evidencepilot.domain.entity.Source;
+import com.evidencepilot.model.Source;
 
 public record SourceResponseDto(
         Integer id,

@@ -1,6 +1,6 @@
 package com.evidencepilot.ai.config;
 
-import com.evidencepilot.ai.AiModelClient;
+import com.evidencepilot.client.ai.AiModelClient;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -25,8 +25,7 @@ class AiClientConfigTest {
                 .withPropertyValues(
                         "ai.model.local-base-url=http://127.0.0.1:8000",
                         "ai.model.ngrok-base-url=https://good-lumpish-headstone.ngrok-free.dev",
-                        "ai.model.base-url=https://configured-ai.example.test"
-                )
+                        "ai.model.base-url=https://configured-ai.example.test")
                 .run(context -> {
                     assertThat(context.getBean("aiModelBaseUrl", String.class))
                             .isEqualTo("https://configured-ai.example.test");
@@ -59,13 +58,11 @@ class AiClientConfigTest {
                     .withPropertyValues(
                             "ai.model.base-url=" + baseUrl,
                             "ai.model.api-key=",
-                            "ai.model.read-timeout-seconds=1"
-                    )
+                            "ai.model.read-timeout-seconds=1")
                     .run(context -> {
                         AiModelClient client = new AiModelClient(
                                 context.getBean("aiRestClient", RestClient.class),
-                                context.getBean("aiModelBaseUrl", String.class)
-                        );
+                                context.getBean("aiModelBaseUrl", String.class));
 
                         long started = System.nanoTime();
                         assertThatThrownBy(client::health)

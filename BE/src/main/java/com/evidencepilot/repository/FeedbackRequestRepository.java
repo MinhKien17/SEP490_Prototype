@@ -1,7 +1,7 @@
 package com.evidencepilot.repository;
 
-import com.evidencepilot.domain.entity.FeedbackRequest;
-import com.evidencepilot.domain.enums.FeedbackStatus;
+import com.evidencepilot.model.FeedbackRequest;
+import com.evidencepilot.model.FeedbackStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

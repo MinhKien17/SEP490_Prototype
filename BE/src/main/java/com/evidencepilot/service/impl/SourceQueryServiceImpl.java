@@ -1,8 +1,8 @@
 package com.evidencepilot.service.impl;
 
-import com.evidencepilot.domain.entity.Project;
-import com.evidencepilot.domain.entity.Source;
-import com.evidencepilot.domain.entity.User;
+import com.evidencepilot.model.Project;
+import com.evidencepilot.model.Source;
+import com.evidencepilot.model.User;
 import com.evidencepilot.dto.response.SourceResponseDto;
 import com.evidencepilot.repository.ProjectRepository;
 import com.evidencepilot.repository.SourceRepository;

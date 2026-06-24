@@ -1,6 +1,6 @@
 package com.evidencepilot.repository;
 
-import com.evidencepilot.domain.entity.InstructorFeedback;
+import com.evidencepilot.model.InstructorFeedback;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

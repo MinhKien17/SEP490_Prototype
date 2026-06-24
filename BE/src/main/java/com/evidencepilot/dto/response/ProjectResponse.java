@@ -1,7 +1,7 @@
 package com.evidencepilot.dto.response;
 
-import com.evidencepilot.domain.entity.Project;
-import com.evidencepilot.domain.enums.ProjectStatus;
+import com.evidencepilot.model.Project;
+import com.evidencepilot.model.ProjectStatus;
 
 import java.time.LocalDateTime;
 

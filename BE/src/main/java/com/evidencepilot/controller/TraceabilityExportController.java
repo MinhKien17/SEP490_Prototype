@@ -1,12 +1,12 @@
 package com.evidencepilot.controller;
 
-import com.evidencepilot.ai.dto.ClaimMatch;
-import com.evidencepilot.domain.entity.Claim;
-import com.evidencepilot.domain.entity.EvidenceEdge;
-import com.evidencepilot.domain.entity.Project;
-import com.evidencepilot.domain.entity.Source;
-import com.evidencepilot.domain.entity.SourceReference;
-import com.evidencepilot.domain.entity.User;
+import com.evidencepilot.dto.response.ClaimMatch;
+import com.evidencepilot.model.Claim;
+import com.evidencepilot.model.EvidenceEdge;
+import com.evidencepilot.model.Project;
+import com.evidencepilot.model.Source;
+import com.evidencepilot.model.SourceReference;
+import com.evidencepilot.model.User;
 import com.evidencepilot.dto.response.TraceabilityExportResponse;
 import com.evidencepilot.repository.ClaimRepository;
 import com.evidencepilot.repository.FeedbackRequestRepository;

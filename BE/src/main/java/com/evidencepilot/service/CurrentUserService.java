@@ -1,129 +1,37 @@
 package com.evidencepilot.service;
 
-import com.evidencepilot.domain.entity.Claim;
-import com.evidencepilot.domain.entity.Dataset;
-import com.evidencepilot.domain.entity.Paper;
-import com.evidencepilot.domain.entity.Project;
-import com.evidencepilot.domain.entity.Source;
-import com.evidencepilot.domain.entity.User;
-import com.evidencepilot.domain.enums.ProjectStatus;
-import com.evidencepilot.domain.enums.UserRole;
-import com.evidencepilot.repository.FeedbackRequestRepository;
-import com.evidencepilot.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Service;
+import com.evidencepilot.model.Claim;
+import com.evidencepilot.model.Dataset;
+import com.evidencepilot.model.Paper;
+import com.evidencepilot.model.Project;
+import com.evidencepilot.model.Source;
+import com.evidencepilot.model.User;
+import com.evidencepilot.model.UserRole;
 import org.springframework.web.server.ResponseStatusException;
 
-@Service
-@RequiredArgsConstructor
-public class CurrentUserService {
+public interface CurrentUserService {
 
-    private final UserRepository userRepository;
-    private final FeedbackRequestRepository feedbackRequestRepository;
+    User requireCurrentUser();
 
-    public User requireCurrentUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required.");
-        }
+    boolean isAdmin(User user);
 
-        Object principal = authentication.getPrincipal();
-        if (!(principal instanceof String email) || email.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required.");
-        }
+    boolean isInstructor(User user);
 
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED,
-                        "Authenticated user not found."));
-    }
+    boolean ownsUserIdOrAdmin(User currentUser, Integer userId);
 
-    public boolean isAdmin(User user) {
-        return user.getRole() == UserRole.ADMIN;
-    }
+    void requireRole(User currentUser, UserRole role);
 
-    public boolean isInstructor(User user) {
-        return user.getRole() == UserRole.INSTRUCTOR;
-    }
+    void requireUserIdOrAdmin(User currentUser, Integer userId);
 
-    public boolean ownsUserIdOrAdmin(User currentUser, Integer userId) {
-        return isAdmin(currentUser) || currentUser.getId().equals(userId);
-    }
+    void requireProjectAccess(User currentUser, Project project);
 
-    public void requireRole(User currentUser, UserRole role) {
-        if (!isAdmin(currentUser) && currentUser.getRole() != role) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Insufficient role.");
-        }
-    }
+    void requireProjectWriteAccess(User currentUser, Project project);
 
-    public void requireUserIdOrAdmin(User currentUser, Integer userId) {
-        if (!ownsUserIdOrAdmin(currentUser, userId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cross-user access denied.");
-        }
-    }
+    void requireDatasetAccess(User currentUser, Dataset dataset);
 
-    public void requireProjectAccess(User currentUser, Project project) {
-        if (isAdmin(currentUser)) {
-            return;
-        }
-        if (project.getStudent() == null || !currentUser.getId().equals(project.getStudent().getId())) {
-            if (currentUser.getRole() == UserRole.INSTRUCTOR
-                    && project.getStatus() == ProjectStatus.IN_REVIEW
-                    && feedbackRequestRepository.existsByProjectIdAndInstructorId(project.getId(), currentUser.getId())) {
-                return;
-            }
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Project access denied.");
-        }
-    }
+    void requireClaimAccess(User currentUser, Claim claim);
 
-    public void requireProjectWriteAccess(User currentUser, Project project) {
-        requireProjectAccess(currentUser, project);
-        if (isAdmin(currentUser)) {
-            return;
-        }
-        if (project.getStatus() == ProjectStatus.IN_REVIEW) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                    "Project is in review and cannot be modified.");
-        }
-        if (project.getStudent() == null || !currentUser.getId().equals(project.getStudent().getId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Project write access denied.");
-        }
-    }
+    void requirePaperAccess(User currentUser, Paper paper);
 
-    public void requireDatasetAccess(User currentUser, Dataset dataset) {
-        if (isAdmin(currentUser)) {
-            return;
-        }
-        if (dataset.getInstructor() == null || !currentUser.getId().equals(dataset.getInstructor().getId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Dataset access denied.");
-        }
-    }
-
-    public void requireClaimAccess(User currentUser, Claim claim) {
-        requireProjectAccess(currentUser, claim.getProject());
-    }
-
-    public void requirePaperAccess(User currentUser, Paper paper) {
-        requireProjectAccess(currentUser, paper.getProject());
-    }
-
-    public void requireSourceAccess(User currentUser, Source source) {
-        if (isAdmin(currentUser)) {
-            return;
-        }
-        if (source.getProject() != null) {
-            requireProjectAccess(currentUser, source.getProject());
-            return;
-        }
-        if (source.getDataset() != null) {
-            requireDatasetAccess(currentUser, source.getDataset());
-            return;
-        }
-        if (source.getUploadedBy() != null && currentUser.getId().equals(source.getUploadedBy().getId())) {
-            return;
-        }
-        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Source access denied.");
-    }
+    void requireSourceAccess(User currentUser, Source source);
 }

@@ -1,6 +1,6 @@
 package com.evidencepilot.repository;
 
-import com.evidencepilot.domain.entity.Source;
+import com.evidencepilot.model.Source;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

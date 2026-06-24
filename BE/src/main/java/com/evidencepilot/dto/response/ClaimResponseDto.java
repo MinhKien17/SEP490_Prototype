@@ -1,6 +1,6 @@
 package com.evidencepilot.dto.response;
 
-import com.evidencepilot.domain.entity.Claim;
+import com.evidencepilot.model.Claim;
 import java.math.BigDecimal;
 
 public record ClaimResponseDto(

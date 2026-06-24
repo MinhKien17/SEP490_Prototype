@@ -1,7 +1,7 @@
 package com.evidencepilot.dto.response;
 
-import com.evidencepilot.domain.entity.User;
-import com.evidencepilot.domain.enums.UserRole;
+import com.evidencepilot.model.User;
+import com.evidencepilot.model.UserRole;
 
 import java.time.LocalDateTime;
 

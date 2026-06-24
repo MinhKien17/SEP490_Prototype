@@ -1,12 +1,12 @@
 package com.evidencepilot.controller;
 
-import com.evidencepilot.domain.entity.FeedbackRequest;
-import com.evidencepilot.domain.entity.InstructorFeedback;
-import com.evidencepilot.domain.entity.Project;
-import com.evidencepilot.domain.entity.User;
-import com.evidencepilot.domain.enums.FeedbackStatus;
-import com.evidencepilot.domain.enums.ProjectStatus;
-import com.evidencepilot.domain.enums.UserRole;
+import com.evidencepilot.model.FeedbackRequest;
+import com.evidencepilot.model.InstructorFeedback;
+import com.evidencepilot.model.Project;
+import com.evidencepilot.model.User;
+import com.evidencepilot.model.FeedbackStatus;
+import com.evidencepilot.model.ProjectStatus;
+import com.evidencepilot.model.UserRole;
 import com.evidencepilot.dto.request.InstructorFeedbackRequest;
 import com.evidencepilot.dto.request.SubmitReviewRequest;
 import com.evidencepilot.dto.response.FeedbackRequestResponseDto;

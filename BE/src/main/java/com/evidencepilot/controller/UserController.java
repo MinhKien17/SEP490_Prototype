@@ -1,6 +1,6 @@
 package com.evidencepilot.controller;
 
-import com.evidencepilot.domain.entity.User;
+import com.evidencepilot.model.User;
 import com.evidencepilot.dto.request.UpdateProfileRequest;
 import com.evidencepilot.dto.response.UserDto;
 import com.evidencepilot.repository.UserRepository;

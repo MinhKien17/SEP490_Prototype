@@ -1,6 +1,6 @@
 package com.evidencepilot.controller;
 
-import com.evidencepilot.ai.AiModelClient;
+import com.evidencepilot.client.ai.AiModelClient;
 import com.evidencepilot.dto.response.ApiErrorResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -19,8 +19,7 @@ class GlobalExceptionHandlerTest {
 
         ResponseEntity<ApiErrorResponse> response = handler.handleAiApi(
                 new AiModelClient.AiApiException("POST /ai/test", 503),
-                request
-        );
+                request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
         assertThat(response.getBody()).isNotNull();

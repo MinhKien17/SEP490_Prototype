@@ -1,6 +1,6 @@
 package com.evidencepilot.dto.response;
 
-import com.evidencepilot.domain.entity.PaperSection;
+import com.evidencepilot.model.PaperSection;
 
 public record PaperSectionResponseDto(
         Integer id,

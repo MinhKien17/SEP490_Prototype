@@ -1,6 +1,6 @@
 package com.evidencepilot.dto.request;
 
-import com.evidencepilot.domain.enums.UserRole;
+import com.evidencepilot.model.UserRole;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

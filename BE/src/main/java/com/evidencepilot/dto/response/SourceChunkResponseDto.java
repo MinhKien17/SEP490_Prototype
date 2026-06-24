@@ -1,6 +1,6 @@
 package com.evidencepilot.dto.response;
 
-import com.evidencepilot.domain.entity.SourceChunk;
+import com.evidencepilot.model.SourceChunk;
 
 public record SourceChunkResponseDto(
         Integer id,

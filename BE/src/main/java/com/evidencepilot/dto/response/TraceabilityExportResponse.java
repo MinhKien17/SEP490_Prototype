@@ -1,7 +1,7 @@
 package com.evidencepilot.dto.response;
 
-import com.evidencepilot.domain.enums.FeedbackStatus;
-import com.evidencepilot.domain.enums.ProjectStatus;
+import com.evidencepilot.model.FeedbackStatus;
+import com.evidencepilot.model.ProjectStatus;
 
 import java.math.BigDecimal;
 import java.time.Instant;

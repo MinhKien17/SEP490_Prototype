@@ -1,9 +1,9 @@
 package com.evidencepilot.controller;
 
-import com.evidencepilot.ai.dto.ClaimMatchResponse;
-import com.evidencepilot.domain.entity.Claim;
-import com.evidencepilot.domain.entity.Project;
-import com.evidencepilot.domain.entity.User;
+import com.evidencepilot.dto.response.ClaimMatchResponse;
+import com.evidencepilot.model.Claim;
+import com.evidencepilot.model.Project;
+import com.evidencepilot.model.User;
 import com.evidencepilot.dto.response.ClaimResponseDto;
 import com.evidencepilot.repository.ClaimRepository;
 import com.evidencepilot.repository.ProjectRepository;

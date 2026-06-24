@@ -1,9 +1,9 @@
 package com.evidencepilot.controller;
 
-import com.evidencepilot.domain.entity.Source;
-import com.evidencepilot.domain.entity.SourceChunk;
-import com.evidencepilot.domain.entity.Project;
-import com.evidencepilot.domain.entity.User;
+import com.evidencepilot.model.Source;
+import com.evidencepilot.model.SourceChunk;
+import com.evidencepilot.model.Project;
+import com.evidencepilot.model.User;
 import com.evidencepilot.dto.response.SourceResponseDto;
 import com.evidencepilot.dto.response.SourceChunkResponseDto;
 import com.evidencepilot.repository.DatasetRepository;

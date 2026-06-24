@@ -1,6 +1,6 @@
 package com.evidencepilot.dto.response;
 
-import com.evidencepilot.domain.entity.InstructorFeedback;
+import com.evidencepilot.model.InstructorFeedback;
 import java.time.LocalDateTime;
 
 public record InstructorFeedbackResponseDto(

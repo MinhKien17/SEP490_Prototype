@@ -1,6 +1,6 @@
 package com.evidencepilot.controller;
 
-import com.evidencepilot.ai.AiModelClient;
+import com.evidencepilot.client.ai.AiModelClient;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -19,8 +19,7 @@ class HealthControllerTest {
     void healthCallsAiWorkerHealthEndpoint() {
         Map<String, Object> aiHealth = Map.of(
                 "status", "ok",
-                "model", "evidencopilot:latest"
-        );
+                "model", "evidencopilot:latest");
         when(aiModelClient.health()).thenReturn(aiHealth);
 
         Map<String, Object> response = controller.health();

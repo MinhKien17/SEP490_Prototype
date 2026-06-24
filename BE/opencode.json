@@ -1,0 +1,9 @@
+{
+    "provider": {
+        "opencodezen": {
+            "options": {
+                "timeout": 3600000
+            }
+        }
+    }
+}

@@ -1,6 +1,6 @@
 package com.evidencepilot.service;
 
-import com.evidencepilot.domain.entity.User;
+import com.evidencepilot.model.User;
 import com.evidencepilot.dto.response.SourceResponseDto;
 import java.util.List;
 

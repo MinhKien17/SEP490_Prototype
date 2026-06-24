@@ -1,10 +1,10 @@
 package com.evidencepilot.controller;
 
-import com.evidencepilot.ai.AiModelClient;
-import com.evidencepilot.domain.entity.Dataset;
-import com.evidencepilot.domain.entity.Source;
-import com.evidencepilot.domain.entity.SourceChunk;
-import com.evidencepilot.domain.entity.User;
+import com.evidencepilot.client.ai.AiModelClient;
+import com.evidencepilot.model.Dataset;
+import com.evidencepilot.model.Source;
+import com.evidencepilot.model.SourceChunk;
+import com.evidencepilot.model.User;
 import com.evidencepilot.dto.response.DatasetGraphResponseDto;
 import com.evidencepilot.dto.response.DatasetSimilarityResponseDto;
 import com.evidencepilot.dto.response.DatasetSourceUploadResponseDto;
@@ -13,8 +13,8 @@ import com.evidencepilot.repository.SourceChunkRepository;
 import com.evidencepilot.repository.SourceRepository;
 import com.evidencepilot.repository.UserRepository;
 import com.evidencepilot.service.CurrentUserService;
-import com.evidencepilot.service.QdrantClient;
-import com.evidencepilot.service.QdrantSearchResult;
+import com.evidencepilot.client.qdrant.QdrantClient;
+import com.evidencepilot.client.qdrant.QdrantSearchResult;
 import com.evidencepilot.service.SourceExtractionService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -53,8 +53,7 @@ class DatasetControllerTest {
             userRepository,
             sourceExtractionService,
             aiModelClient,
-            qdrantClient
-    );
+            qdrantClient);
 
     @TempDir
     private Path uploadDir;
@@ -67,8 +66,7 @@ class DatasetControllerTest {
                 "file",
                 "source.txt",
                 "text/plain",
-                "alpha beta".getBytes()
-        );
+                "alpha beta".getBytes());
 
         when(currentUserService.requireCurrentUser()).thenReturn(instructor);
         when(datasetRepository.findById(3)).thenReturn(Optional.of(dataset));

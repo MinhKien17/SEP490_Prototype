@@ -1,6 +1,6 @@
 package com.evidencepilot.dto.response;
 
-import com.evidencepilot.domain.entity.Paper;
+import com.evidencepilot.model.Paper;
 import java.time.LocalDateTime;
 
 public record PaperResponseDto(

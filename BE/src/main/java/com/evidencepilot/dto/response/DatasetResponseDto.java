@@ -1,6 +1,6 @@
 package com.evidencepilot.dto.response;
 
-import com.evidencepilot.domain.entity.Dataset;
+import com.evidencepilot.model.Dataset;
 import java.time.LocalDateTime;
 
 public record DatasetResponseDto(
