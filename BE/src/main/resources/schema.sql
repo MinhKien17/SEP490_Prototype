@@ -10,6 +10,9 @@ CREATE TABLE users (
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     role VARCHAR(50) NOT NULL CHECK (role IN ('STUDENT', 'INSTRUCTOR', 'ADMIN')),
+    email_verified BOOLEAN NOT NULL DEFAULT TRUE,
+    email_verification_token_hash VARCHAR(255) UNIQUE,
+    email_verification_token_expires_at DATETIME,
     first_name VARCHAR(100),
     last_name VARCHAR(100),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP

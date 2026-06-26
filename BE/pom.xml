@@ -104,9 +104,8 @@
 
         <!-- ── Spring Security Crypto – BCrypt only, no web/auth filters ──── -->
         <dependency>
-            <groupId>org.springframework.security</groupId>
-            <artifactId>spring-security-crypto</artifactId>
-            <!-- version managed by spring-boot-starter-parent -->
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
         <!-- ── Tests ───────────────────────────────────────────────────── -->

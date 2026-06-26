@@ -123,10 +123,10 @@ services:
       QDRANT_URL: http://vector_db:6333
 
       # ── MinIO (hardcoded, no .env vars provided) ─────────────────────────────
-      MINIO_ENDPOINT: http://minio:9000
+      MINIO_URL: http://minio:9000
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: MinioAdminSecurePass123!
-      MINIO_BUCKET: evidence-pilot-bucket
+      MINIO_BUCKET_NAME: evidence-pilot-bucket
 
       # ── RabbitMQ (hardcoded, no .env vars provided) ──────────────────────────
       RABBITMQ_HOST: rabbitmq
@@ -142,6 +142,15 @@ services:
       # ── Admin seed (from .env) ──────────────────────────────────────────────
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+
+      EMAIL_VERIFICATION_URL: ${EMAIL_VERIFICATION_URL:-}
+      EMAIL_VERIFICATION_TOKEN_TTL_HOURS: ${EMAIL_VERIFICATION_TOKEN_TTL_HOURS:-24}
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_SMTP_AUTH: ${MAIL_SMTP_AUTH:-true}
+      MAIL_SMTP_STARTTLS_ENABLE: ${MAIL_SMTP_STARTTLS_ENABLE:-true}
 
       SERVER_PORT: 8080
     networks:

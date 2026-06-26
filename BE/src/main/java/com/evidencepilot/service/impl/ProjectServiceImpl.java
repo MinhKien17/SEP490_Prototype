@@ -7,6 +7,7 @@ import com.evidencepilot.exception.ResourceNotFoundException;
 import com.evidencepilot.model.Project;
 import com.evidencepilot.model.ProjectMember;
 import com.evidencepilot.model.enums.ProjectRole;
+import com.evidencepilot.model.enums.ProjectStatus;
 import com.evidencepilot.model.User;
 import com.evidencepilot.repository.ProjectMemberRepository;
 import com.evidencepilot.repository.ProjectRepository;
@@ -56,6 +57,7 @@ public class ProjectServiceImpl implements ProjectService {
 project.setTitle(request.title());
         project.setDescription(request.description());
         project.setTargetStandard(request.targetStandard());
+        project.setStatus(ProjectStatus.DRAFT);
         project.setCreatedAt(LocalDateTime.now());
 
         Project saved = projectRepository.save(project);

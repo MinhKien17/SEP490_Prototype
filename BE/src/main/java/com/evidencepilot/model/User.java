@@ -30,6 +30,15 @@ public class User {
     @Enumerated(EnumType.STRING)
     private UserRole role;
 
+    @Column(name = "email_verified", nullable = false)
+    private Boolean emailVerified = true;
+
+    @Column(name = "email_verification_token_hash", unique = true)
+    private String emailVerificationTokenHash;
+
+    @Column(name = "email_verification_token_expires_at")
+    private LocalDateTime emailVerificationTokenExpiresAt;
+
     private String firstName;
     private String lastName;
 

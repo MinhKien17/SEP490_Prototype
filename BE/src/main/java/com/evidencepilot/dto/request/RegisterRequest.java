@@ -1,9 +1,7 @@
 package com.evidencepilot.dto.request;
 
-import com.evidencepilot.model.enums.UserRole;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -20,7 +18,4 @@ public class RegisterRequest {
     private String firstName;
 
     private String lastName;
-
-    @NotNull
-    private UserRole role;
 }

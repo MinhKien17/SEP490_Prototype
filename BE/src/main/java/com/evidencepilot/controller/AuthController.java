@@ -11,10 +11,14 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -24,7 +28,7 @@ public class AuthController {
 
     private final AuthService authService;
 
-    @Operation(summary = "Register a new user", description = "Creates a new user account and returns a signed JWT. Public endpoint.")
+    @Operation(summary = "Register a new user", description = "Creates a new student account and sends an email verification link. Public endpoint.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "User registered successfully"),
             @ApiResponse(responseCode = "400", description = "Validation error"),
@@ -33,6 +37,20 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
         return ResponseEntity.ok(authService.register(request));
+    }
+
+    @Operation(summary = "Verify registered email", description = "Activates a newly registered account using the verification token sent by email. Public endpoint.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Email verified successfully"),
+            @ApiResponse(responseCode = "400", description = "Missing, invalid, or expired verification token")
+    })
+    @GetMapping("/verify-email")
+    public ResponseEntity<Map<String, String>> verifyEmail(@RequestParam String token) {
+        String email = authService.verifyEmail(token);
+        return ResponseEntity.ok(Map.of(
+                "message", "Email verified successfully",
+                "email", email
+        ));
     }
 
     @Operation(summary = "Authenticate user", description = "Validates credentials and returns a signed JWT. Public endpoint.")
