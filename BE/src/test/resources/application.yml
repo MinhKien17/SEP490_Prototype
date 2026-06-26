@@ -1,0 +1,43 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=MySQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
+  sql:
+    init:
+      mode: never
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 50MB
+      max-request-size: 52MB
+
+server:
+  port: 0
+  forward-headers-strategy: framework
+
+jwt:
+  secret: EvidencePilot-Super-Secret-Key-2025!!
+  expiration-ms: 86400000
+
+ai:
+  model:
+    base-url: http://localhost:9999
+
+logging:
+  level:
+    org.hibernate.SQL: WARN
+
+app:
+  upload:
+    dir: ${java.io.tmpdir}/evidence-pilot-uploads

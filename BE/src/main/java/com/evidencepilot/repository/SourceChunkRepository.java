@@ -5,15 +5,16 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.UUID;
 
 @Repository
-public interface SourceChunkRepository extends JpaRepository<SourceChunk, Integer> {
+public interface SourceChunkRepository extends JpaRepository<SourceChunk, UUID> {
 
-    List<SourceChunk> findBySourceId(Integer sourceId);
+    List<SourceChunk> findBySourceId(UUID sourceId);
 
-    List<SourceChunk> findBySourceProjectId(Integer projectId);
+    List<SourceChunk> findBySourceProjectId(UUID projectId);
 
-    List<SourceChunk> findBySourceDatasetId(Integer datasetId);
+    List<SourceChunk> findBySourceCollectionId(UUID collectionId);
 
-    long countBySourceId(Integer sourceId);
+    long countBySourceId(UUID sourceId);
 }

@@ -1,53 +1,38 @@
 package com.evidencepilot.model;
 
-import com.evidencepilot.model.FeedbackStatus;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
-/**
- * Represents a student's request for instructor feedback on a project.
- * Maps to the {@code feedback_requests} table.
- */
+import org.hibernate.annotations.JdbcTypeCode;
+
 @Entity
 @Table(name = "feedback_requests")
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+@Getter
+@Setter
 public class FeedbackRequest {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id")
-    private Integer id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "id", columnDefinition = "BINARY(16)")
+    @JdbcTypeCode(java.sql.Types.BINARY)
+    private UUID id;
 
-    /**
-     * The project being reviewed.
-     * Foreign key: feedback_requests.project_id → projects.id
-     */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "project_id", nullable = false)
+    @JoinColumn(name = "project_id", columnDefinition = "BINARY(16)", referencedColumnName = "id", nullable = false)
     @com.fasterxml.jackson.annotation.JsonIgnore
     private Project project;
 
-    /**
-     * The student who initiated the feedback request.
-     * Foreign key: feedback_requests.student_id → users.id
-     */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "student_id", nullable = false)
+    @JoinColumn(name = "student_id", columnDefinition = "BINARY(16)", referencedColumnName = "id", nullable = false)
     @com.fasterxml.jackson.annotation.JsonIgnore
     private User student;
 
-    /**
-     * The instructor assigned to provide feedback.
-     * Foreign key: feedback_requests.instructor_id → users.id
-     */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "instructor_id", nullable = false)
+    @JoinColumn(name = "instructor_id", columnDefinition = "BINARY(16)", referencedColumnName = "id", nullable = false)
     @com.fasterxml.jackson.annotation.JsonIgnore
     private User instructor;
 
@@ -57,4 +42,17 @@ public class FeedbackRequest {
 
     @Column(name = "requested_at")
     private LocalDateTime requestedAt;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        FeedbackRequest that = (FeedbackRequest) o;
+        return id.equals(that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return id.hashCode();
+    }
 }

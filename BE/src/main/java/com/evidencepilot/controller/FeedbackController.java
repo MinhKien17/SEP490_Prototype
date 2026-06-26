@@ -1,16 +1,16 @@
 package com.evidencepilot.controller;
 
+import com.evidencepilot.dto.request.InstructorFeedbackRequest;
+import com.evidencepilot.dto.request.SubmitReviewRequest;
+import com.evidencepilot.dto.response.FeedbackRequestResponseDto;
+import com.evidencepilot.dto.response.InstructorFeedbackResponseDto;
 import com.evidencepilot.model.FeedbackRequest;
 import com.evidencepilot.model.InstructorFeedback;
 import com.evidencepilot.model.Project;
 import com.evidencepilot.model.User;
 import com.evidencepilot.model.FeedbackStatus;
-import com.evidencepilot.model.ProjectStatus;
-import com.evidencepilot.model.UserRole;
-import com.evidencepilot.dto.request.InstructorFeedbackRequest;
-import com.evidencepilot.dto.request.SubmitReviewRequest;
-import com.evidencepilot.dto.response.FeedbackRequestResponseDto;
-import com.evidencepilot.dto.response.InstructorFeedbackResponseDto;
+import com.evidencepilot.model.enums.ProjectStatus;
+import com.evidencepilot.model.enums.UserRole;
 import com.evidencepilot.repository.FeedbackRequestRepository;
 import com.evidencepilot.repository.InstructorFeedbackRepository;
 import com.evidencepilot.repository.ProjectRepository;
@@ -26,6 +26,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api")
@@ -55,7 +56,7 @@ public class FeedbackController {
     @PostMapping("/projects/{projectId}/submit-review")
     @Transactional
     public ResponseEntity<FeedbackRequestResponseDto> submitForReview(
-            @PathVariable Integer projectId,
+            @PathVariable UUID projectId,
             @Valid @RequestBody SubmitReviewRequest request) {
 
         User currentUser = currentUserService.requireCurrentUser();
@@ -64,15 +65,15 @@ public class FeedbackController {
                         "Project not found: " + projectId));
         currentUserService.requireProjectWriteAccess(currentUser, project);
 
-        User instructor = userRepository.findById(request.getInstructorId())
+        User instructor = userRepository.findById(request.instructorId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "Instructor not found: " + request.getInstructorId()));
+                        "Instructor not found: " + request.instructorId()));
         if (instructor.getRole() != UserRole.INSTRUCTOR) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Assigned user is not an instructor.");
         }
 
         FeedbackRequest feedbackRequest = new FeedbackRequest();
-        feedbackRequest.setProject(project);
+feedbackRequest.setProject(project);
         feedbackRequest.setStudent(project.getStudent());
         feedbackRequest.setInstructor(instructor);
         feedbackRequest.setStatus(FeedbackStatus.PENDING);
@@ -88,7 +89,7 @@ public class FeedbackController {
     @PostMapping("/feedback-requests/{id}/feedback")
     @Transactional
     public InstructorFeedbackResponseDto comment(
-            @PathVariable Integer id,
+            @PathVariable UUID id,
             @Valid @RequestBody InstructorFeedbackRequest request) {
 
         User currentUser = currentUserService.requireCurrentUser();
@@ -96,11 +97,13 @@ public class FeedbackController {
 
         InstructorFeedback feedback = instructorFeedbackRepository.findByRequestId(id)
                 .orElseGet(InstructorFeedback::new);
+        if (feedback.getId() == null) {
+}
         feedback.setRequest(feedbackRequest);
         feedback.setInstructor(currentUserService.isAdmin(currentUser)
                 ? feedbackRequest.getInstructor()
                 : currentUser);
-        feedback.setContent(request.getContent());
+        feedback.setContent(request.content());
         feedback.setCreatedAt(LocalDateTime.now());
         InstructorFeedback saved = instructorFeedbackRepository.save(feedback);
         return InstructorFeedbackResponseDto.fromEntity(saved);
@@ -108,23 +111,23 @@ public class FeedbackController {
 
     @PostMapping("/feedback-requests/{id}/return-to-active")
     @Transactional
-    public FeedbackRequestResponseDto returnToActive(@PathVariable Integer id) {
+    public FeedbackRequestResponseDto returnToActive(@PathVariable UUID id) {
         return FeedbackRequestResponseDto.fromEntity(transition(id, FeedbackStatus.RETURNED, ProjectStatus.ACTIVE));
     }
 
     @PostMapping("/feedback-requests/{id}/reviewed")
     @Transactional
-    public FeedbackRequestResponseDto markReviewed(@PathVariable Integer id) {
+    public FeedbackRequestResponseDto markReviewed(@PathVariable UUID id) {
         return FeedbackRequestResponseDto.fromEntity(transition(id, FeedbackStatus.REVIEWED, ProjectStatus.ACTIVE));
     }
 
     @PostMapping("/feedback-requests/{id}/rejected")
     @Transactional
-    public FeedbackRequestResponseDto markRejected(@PathVariable Integer id) {
+    public FeedbackRequestResponseDto markRejected(@PathVariable UUID id) {
         return FeedbackRequestResponseDto.fromEntity(transition(id, FeedbackStatus.REJECTED, ProjectStatus.ACTIVE));
     }
 
-    private FeedbackRequest transition(Integer id, FeedbackStatus status, ProjectStatus projectStatus) {
+    private FeedbackRequest transition(UUID id, FeedbackStatus status, ProjectStatus projectStatus) {
         User currentUser = currentUserService.requireCurrentUser();
         FeedbackRequest feedbackRequest = requireFeedbackAccess(id, currentUser, true);
         feedbackRequest.setStatus(status);
@@ -133,7 +136,7 @@ public class FeedbackController {
         return feedbackRequestRepository.save(feedbackRequest);
     }
 
-    private FeedbackRequest requireFeedbackAccess(Integer id, User currentUser, boolean instructorOnly) {
+    private FeedbackRequest requireFeedbackAccess(UUID id, User currentUser, boolean instructorOnly) {
         FeedbackRequest feedbackRequest = feedbackRequestRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Feedback request not found: " + id));

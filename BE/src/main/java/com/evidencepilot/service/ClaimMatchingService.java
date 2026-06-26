@@ -1,9 +1,10 @@
 package com.evidencepilot.service;
 
-import com.evidencepilot.model.Claim;
-import com.evidencepilot.dto.response.ClaimMatchResponse;
+import com.evidencepilot.dto.response.AiSuggestionResponse;
+import java.util.List;
+import java.util.UUID;
 
 public interface ClaimMatchingService {
 
-    ClaimMatchResponse matchClaim(Claim claim, int topK);
+    List<AiSuggestionResponse> matchClaim(UUID claimId, UUID projectId);
 }

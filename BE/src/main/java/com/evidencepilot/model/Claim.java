@@ -1,51 +1,69 @@
 package com.evidencepilot.model;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
 
-import java.math.BigDecimal;
+import org.hibernate.annotations.JdbcTypeCode;
 
-/**
- * Represents an AI-extracted claim from a project's paper.
- * Maps to the {@code claims} table.
- */
+import lombok.Getter;
+import lombok.Setter;
+
 @Entity
 @Table(name = "claims")
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+@Getter
+@Setter
 public class Claim {
-
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id")
-    private Integer id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "id", columnDefinition = "BINARY(16)")
+    @JdbcTypeCode(java.sql.Types.BINARY)
+    private UUID id;
 
-    /**
-     * The project this claim belongs to.
-     * Foreign key: claims.project_id → projects.id
-     */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "project_id", nullable = false)
-    @com.fasterxml.jackson.annotation.JsonIgnore
+    @ManyToOne
+    @JoinColumn(name = "project_id", columnDefinition = "BINARY(16)", referencedColumnName = "id", nullable = false)
     private Project project;
 
-    @Column(name = "content", nullable = false, columnDefinition = "TEXT")
+    @ManyToOne
+    @JoinColumn(name = "section_id", columnDefinition = "BINARY(16)", referencedColumnName = "id")
+    private PaperSection section;
+
+    @Column(nullable = false)
     private String content;
 
-    /**
-     * Confidence score assigned by the AI pipeline (0.00 – 1.00).
-     */
-    @Column(name = "ai_confidence_score", precision = 5, scale = 4)
-    private BigDecimal aiConfidenceScore;
+    @Column(name = "ai_confidence_score")
+    private Float aiConfidenceScore;
 
-    @Column(name = "active", nullable = false)
+    @Column(name = "claim_version", nullable = false)
+    private Integer claimVersion;
+
     private boolean active = true;
 
-    @OneToMany(mappedBy = "claim", cascade = CascadeType.ALL, orphanRemoval = true)
-    @com.fasterxml.jackson.annotation.JsonIgnore
-    private java.util.List<EvidenceEdge> evidenceEdges;
-}
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
 
+    @OneToMany(mappedBy = "claim")
+    private List<AiSuggestion> aiSuggestions;
+
+    @OneToMany(mappedBy = "claim")
+    private List<ClaimEvidenceMapping> claimEvidenceMappings;
+
+    @OneToMany(mappedBy = "claim")
+    private List<EvidenceEdge> evidenceEdges;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
+        Claim claim = (Claim) o;
+        return id.equals(claim.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return id.hashCode();
+    }
+}

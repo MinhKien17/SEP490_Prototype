@@ -2,12 +2,9 @@ package com.evidencepilot.repository;
 
 import com.evidencepilot.model.PaperSection;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-
 import java.util.List;
+import java.util.UUID;
 
-@Repository
-public interface PaperSectionRepository extends JpaRepository<PaperSection, Integer> {
-
-    List<PaperSection> findByPaperIdOrderBySectionIndex(Integer paperId);
+public interface PaperSectionRepository extends JpaRepository<PaperSection, UUID> {
+    List<PaperSection> findByDocumentIdOrderBySectionOrderAsc(UUID documentId);
 }

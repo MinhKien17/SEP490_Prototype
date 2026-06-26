@@ -1,16 +1,17 @@
 package com.evidencepilot.controller;
 
-import com.evidencepilot.dto.response.ClaimMatch;
+import com.evidencepilot.dto.response.TraceabilityExportResponse;
 import com.evidencepilot.model.Claim;
+import com.evidencepilot.model.DocumentChunk;
 import com.evidencepilot.model.EvidenceEdge;
 import com.evidencepilot.model.Project;
 import com.evidencepilot.model.Source;
 import com.evidencepilot.model.SourceReference;
 import com.evidencepilot.model.User;
-import com.evidencepilot.dto.response.TraceabilityExportResponse;
 import com.evidencepilot.repository.ClaimRepository;
-import com.evidencepilot.repository.FeedbackRequestRepository;
+import com.evidencepilot.repository.DocumentChunkRepository;
 import com.evidencepilot.repository.EvidenceEdgeRepository;
+import com.evidencepilot.repository.FeedbackRequestRepository;
 import com.evidencepilot.repository.ProjectRepository;
 import com.evidencepilot.repository.SourceReferenceRepository;
 import com.evidencepilot.repository.SourceRepository;
@@ -27,8 +28,10 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -45,12 +48,13 @@ public class TraceabilityExportController {
     private final SourceReferenceRepository sourceReferenceRepository;
     private final FeedbackRequestRepository feedbackRequestRepository;
     private final EvidenceEdgeRepository evidenceEdgeRepository;
+    private final DocumentChunkRepository documentChunkRepository;
     private final ClaimMatchingService claimMatchingService;
     private final CurrentUserService currentUserService;
     private final ObjectMapper objectMapper;
 
     @GetMapping("/{projectId}/traceability-export")
-    public TraceabilityExportResponse export(@PathVariable Integer projectId) {
+    public TraceabilityExportResponse export(@PathVariable UUID projectId) {
         User currentUser = currentUserService.requireCurrentUser();
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
@@ -61,28 +65,36 @@ public class TraceabilityExportController {
         currentUserService.requireProjectAccess(currentUser, project);
 
         List<SourceReference> references = sourceReferenceRepository
-                .findBySourceProjectIdAndSourceActiveTrueOrderBySourceIdAscReferenceIndexAsc(projectId)
-                .stream()
-                .toList();
-        Map<Integer, SourceReference> firstReferenceBySource = references.stream()
+                .findBySourceProjectIdAndSourceActiveTrueOrderBySourceIdAscReferenceIndexAsc(projectId);
+
+        Map<UUID, SourceReference> firstReferenceBySource = references.stream()
                 .collect(Collectors.toMap(
                         reference -> reference.getSource().getId(),
                         reference -> reference,
                         (first, ignored) -> first
                 ));
-        Map<Integer, Long> referenceCountBySource = references.stream()
-                .collect(Collectors.groupingBy(reference -> reference.getSource().getId(), Collectors.counting()));
+        Map<UUID, Long> referenceCountBySource = references.stream()
+                .collect(Collectors.groupingBy(
+                        reference -> reference.getSource().getId(),
+                        Collectors.counting()));
 
         List<TraceabilityExportResponse.TraceabilityClaim> claims = claimRepository
-                .findByProjectIdAndActiveTrue(projectId)
+                .findByProjectId(projectId)
                 .stream()
-                .map(claim -> claimExport(claim, firstReferenceBySource))
+                .filter(Claim::isActive)
+                .map(claim -> claimExport(claim, projectId, firstReferenceBySource))
                 .toList();
 
         List<TraceabilityExportResponse.TraceabilitySource> sources = sourceRepository
                 .findByProjectIdAndActiveTrue(projectId)
                 .stream()
-                .map(source -> sourceExport(source, referenceCountBySource))
+                .map(source -> new TraceabilityExportResponse.TraceabilitySource(
+                        source.getId(),
+                        missingIfBlank(source.getOriginalFilename()),
+                        missingIfBlank(source.getContentType()),
+                        source.getFileSizeBytes(),
+                        missingIfBlank(source.getFileUrl()),
+                        referenceCountBySource.getOrDefault(source.getId(), 0L).intValue()))
                 .toList();
 
         List<TraceabilityExportResponse.TraceabilityFeedback> feedback = feedbackRequestRepository
@@ -91,8 +103,7 @@ public class TraceabilityExportController {
                 .map(request -> new TraceabilityExportResponse.TraceabilityFeedback(
                         request.getId(),
                         request.getInstructor() == null ? null : request.getInstructor().getId(),
-                        request.getStatus()
-                ))
+                        request.getStatus()))
                 .toList();
 
         return new TraceabilityExportResponse(
@@ -102,19 +113,40 @@ public class TraceabilityExportController {
                 Instant.now(),
                 claims,
                 sources,
-                feedback
-        );
+                feedback);
     }
 
     private TraceabilityExportResponse.TraceabilityClaim claimExport(
-            Claim claim,
-            Map<Integer, SourceReference> firstReferenceBySource) {
+            Claim claim, UUID projectId,
+            Map<UUID, SourceReference> firstReferenceBySource) {
 
         List<TraceabilityExportResponse.TraceabilityMatch> matches = claimMatchingService
-                .matchClaim(claim, 5)
-                .matches()
+                .matchClaim(claim.getId(), projectId)
                 .stream()
-                .map(match -> matchExport(match, firstReferenceBySource))
+                .map(suggestion -> {
+                    DocumentChunk chunk = suggestion.documentChunkId() != null
+                            ? documentChunkRepository.findById(suggestion.documentChunkId()).orElse(null)
+                            : null;
+                    UUID sourceId = chunk != null && chunk.getDocument() != null
+                            ? chunk.getDocument().getId() : null;
+                    String filename = chunk != null && chunk.getDocument() != null
+                            ? missingIfBlank(chunk.getDocument().getOriginalFilename()) : MISSING;
+                    SourceReference reference = sourceId != null
+                            ? firstReferenceBySource.get(sourceId) : null;
+                    return new TraceabilityExportResponse.TraceabilityMatch(
+                            sourceId != null ? sourceId.toString() : MISSING,
+                            filename,
+                            suggestion.documentChunkId(),
+                            null,
+                            chunk != null ? missingIfBlank(chunk.getText()) : MISSING,
+                            suggestion.score(),
+                            suggestion.status(),
+                            missingIfBlank(suggestion.explanation()),
+                            reference == null ? MISSING : missingIfBlank(reference.getTitle()),
+                            reference == null || reference.getPublicationYear() == null
+                                    ? MISSING : String.valueOf(reference.getPublicationYear()),
+                            reference == null ? MISSING : missingIfBlank(reference.getRawText()));
+                })
                 .toList();
 
         List<EvidenceEdge> edges = evidenceEdgeRepository.findByClaimId(claim.getId());
@@ -123,14 +155,16 @@ public class TraceabilityExportController {
             graphData = Map.of("status", MISSING);
         } else {
             EvidenceEdge edge = edges.get(0);
-            Map<String, Object> map = new java.util.LinkedHashMap<>();
+            Map<String, Object> map = new LinkedHashMap<>();
             map.put("verdict", edge.getVerdict());
             map.put("confidence", edge.getConfidenceScore());
             map.put("explanation", edge.getExplanation());
 
-            if (edge.getSourceChunk() != null && edge.getSourceChunk().getSource() != null) {
-                map.put("matched_source_ids", List.of(String.valueOf(edge.getSourceChunk().getSource().getId())));
-                map.put("_source_id_used", String.valueOf(edge.getSourceChunk().getSource().getId()));
+            if (edge.getDocumentChunk() != null && edge.getDocumentChunk().getDocument() != null) {
+                map.put("matched_source_ids",
+                        List.of(String.valueOf(edge.getDocumentChunk().getDocument().getId())));
+                map.put("_source_id_used",
+                        String.valueOf(edge.getDocumentChunk().getDocument().getId()));
             } else {
                 map.put("matched_source_ids", List.of());
                 map.put("_source_id_used", "");
@@ -142,7 +176,8 @@ public class TraceabilityExportController {
                     missingEvidenceList = objectMapper.readValue(edge.getMissingEvidence(),
                             new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {});
                 } catch (Exception e) {
-                    log.error("Failed to parse missing evidence JSON for edge {}: {}", edge.getId(), edge.getMissingEvidence(), e);
+                    log.error("Failed to parse missing evidence JSON for edge {}: {}",
+                            edge.getId(), edge.getMissingEvidence(), e);
                 }
             }
             map.put("missing_evidence", missingEvidenceList);
@@ -154,52 +189,7 @@ public class TraceabilityExportController {
                 claim.getContent(),
                 claim.getAiConfidenceScore(),
                 graphData,
-                matches
-        );
-    }
-
-    private TraceabilityExportResponse.TraceabilityMatch matchExport(
-            ClaimMatch match,
-            Map<Integer, SourceReference> firstReferenceBySource) {
-
-        Integer sourceId = parseInteger(match.sourceId());
-        SourceReference reference = sourceId == null ? null : firstReferenceBySource.get(sourceId);
-        return new TraceabilityExportResponse.TraceabilityMatch(
-                match.sourceId(),
-                missingIfBlank(match.filename()),
-                match.chunkId(),
-                match.page(),
-                match.excerpt(),
-                match.score(),
-                match.suitability(),
-                match.explanation(),
-                reference == null ? MISSING : missingIfBlank(reference.getTitle()),
-                reference == null || reference.getYear() == null ? MISSING : String.valueOf(reference.getYear()),
-                reference == null ? MISSING : missingIfBlank(reference.getRawText())
-        );
-    }
-
-    private TraceabilityExportResponse.TraceabilitySource sourceExport(
-            Source source,
-            Map<Integer, Long> referenceCountBySource) {
-
-        int referenceCount = referenceCountBySource.getOrDefault(source.getId(), 0L).intValue();
-        return new TraceabilityExportResponse.TraceabilitySource(
-                source.getId(),
-                missingIfBlank(source.getOriginalFilename()),
-                missingIfBlank(source.getContentType()),
-                source.getFileSizeBytes(),
-                missingIfBlank(source.getFileUrl()),
-                referenceCount
-        );
-    }
-
-    private Integer parseInteger(String value) {
-        try {
-            return Integer.valueOf(value);
-        } catch (NumberFormatException e) {
-            return null;
-        }
+                matches);
     }
 
     private String missingIfBlank(String value) {

@@ -1,185 +1,104 @@
 package com.evidencepilot.controller;
 
-import com.evidencepilot.dto.response.ClaimMatchResponse;
-import com.evidencepilot.model.Claim;
-import com.evidencepilot.model.Project;
-import com.evidencepilot.model.User;
-import com.evidencepilot.dto.response.ClaimResponseDto;
-import com.evidencepilot.repository.ClaimRepository;
-import com.evidencepilot.repository.ProjectRepository;
-import com.evidencepilot.service.AiAnalysisService;
-import com.evidencepilot.service.ClaimMatchingService;
-import com.evidencepilot.service.CurrentUserService;
+import com.evidencepilot.dto.request.ClaimCreationRequest;
+import com.evidencepilot.dto.response.AiSuggestionResponse;
+import com.evidencepilot.dto.response.ClaimEvidenceMappingResponse;
+import com.evidencepilot.dto.response.ClaimResponse;
+import com.evidencepilot.dto.response.EvidenceEdgeResponse;
+import com.evidencepilot.service.ClaimService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
-
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
-/**
- * REST controller for Claim CRUD operations and AI analysis trigger.
- *
- * <p>Base path: {@code /api/claims}</p>
- */
 @RestController
 @RequestMapping("/api/claims")
 @RequiredArgsConstructor
 public class ClaimController {
 
-    private final ClaimRepository claimRepository;
-    private final ProjectRepository projectRepository;
-    private final AiAnalysisService aiAnalysisService;
-    private final CurrentUserService currentUserService;
-    private final ClaimMatchingService claimMatchingService;
-
-    // ── CRUD ───────────────────────────────────────────────────────────────────
+    private final ClaimService claimService;
 
     @GetMapping
-    public List<ClaimResponseDto> findAll() {
-        User currentUser = currentUserService.requireCurrentUser();
-        List<Claim> claims;
-        if (currentUserService.isAdmin(currentUser)) {
-            claims = claimRepository.findByActiveTrue();
-        } else {
-            claims = claimRepository.findByProjectStudentIdAndActiveTrue(currentUser.getId());
-        }
-        return claims.stream().map(ClaimResponseDto::fromEntity).toList();
+    public List<ClaimResponse> getAllClaims() {
+        return claimService.getAllClaims();
     }
 
     @GetMapping("/{id}")
-    public ClaimResponseDto findById(@PathVariable Integer id) {
-        User currentUser = currentUserService.requireCurrentUser();
-        Claim claim = claimRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "Claim not found: " + id));
-        if (!claim.isActive()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Claim not found: " + id);
-        }
-        currentUserService.requireClaimAccess(currentUser, claim);
-        return ClaimResponseDto.fromEntity(claim);
+    public ClaimResponse getClaimById(@PathVariable UUID id) {
+        return claimService.getClaimById(id);
     }
 
     @GetMapping("/by-project/{projectId}")
-    public List<ClaimResponseDto> findByProject(@PathVariable Integer projectId) {
-        User currentUser = currentUserService.requireCurrentUser();
-        Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "Project not found: " + projectId));
-        currentUserService.requireProjectWriteAccess(currentUser, project);
-        return claimRepository.findByProjectIdAndActiveTrue(projectId).stream()
-                .map(ClaimResponseDto::fromEntity)
-                .toList();
+    public List<ClaimResponse> getClaimsByProject(@PathVariable UUID projectId) {
+        return claimService.getClaimsByProject(projectId);
     }
 
     @PostMapping
-    public ResponseEntity<ClaimResponseDto> create(@RequestBody Claim claim) {
-        User currentUser = currentUserService.requireCurrentUser();
-        if (claim.getProject() == null || claim.getProject().getId() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project is required.");
-        }
-        Project project = projectRepository.findById(claim.getProject().getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "Project not found: " + claim.getProject().getId()));
-        currentUserService.requireProjectAccess(currentUser, project);
-        claim.setProject(project);
-        Claim saved = claimRepository.save(claim);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ClaimResponseDto.fromEntity(saved));
+    @ResponseStatus(HttpStatus.CREATED)
+    public ClaimResponse createClaim(@Valid @RequestBody ClaimCreationRequest request) {
+        return claimService.createClaim(request);
     }
 
     @PutMapping("/{id}")
-    public ClaimResponseDto update(@PathVariable Integer id, @RequestBody Claim claim) {
-        User currentUser = currentUserService.requireCurrentUser();
-        Claim existing = claimRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "Claim not found: " + id));
-        currentUserService.requireProjectWriteAccess(currentUser, existing.getProject());
-        claim.setId(id);
-        claim.setProject(existing.getProject());
-        Claim saved = claimRepository.save(claim);
-        return ClaimResponseDto.fromEntity(saved);
+    public ClaimResponse updateClaim(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
+        String content = (String) body.get("content");
+        Float aiConfidenceScore = body.get("aiConfidenceScore") != null
+                ? ((Number) body.get("aiConfidenceScore")).floatValue()
+                : null;
+        return claimService.updateClaim(id, content, aiConfidenceScore);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Integer id) {
-        User currentUser = currentUserService.requireCurrentUser();
-        Claim existing = claimRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "Claim not found: " + id));
-        currentUserService.requireProjectWriteAccess(currentUser, existing.getProject());
-        existing.setActive(false);
-        claimRepository.save(existing);
-        return ResponseEntity.noContent().build();
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteClaim(@PathVariable UUID id) {
+        claimService.deleteClaim(id);
     }
 
-    // ── AI analysis ────────────────────────────────────────────────────────────
-
-    /**
-     * Triggers the two-phase AI analysis pipeline for a single claim.
-     *
-     * <h3>Auto mode (no parameters)</h3>
-     * <p>The service calls {@code POST /match/claim} first to locate the best
-     * source in the AI system, then calls {@code POST /process/claim} with that
-     * source.  Use this when you want the AI to pick the evidence automatically.</p>
-     *
-     * <h3>Manual mode (sourceId + excerpt provided)</h3>
-     * <p>Skips the match phase and calls {@code POST /process/claim} directly with
-     * the provided {@code sourceId} and {@code excerpt}.  Use this when an instructor
-     * wants to pin the analysis to a specific reference.</p>
-     *
-     * @param id       the Claim to analyse
-     * @param sourceId optional – AI-service source identifier to use directly
-     * @param excerpt  optional – text excerpt from that source (required when sourceId is set)
-     * @param title    optional – source title forwarded to the AI for context
-     * @return the updated Claim with {@code aiConfidenceScore} set and the EvidenceEdge persisted
-     */
-    @PostMapping("/{id}/analyze")
-    public ClaimResponseDto analyze(
-            @PathVariable Integer id,
-            @RequestParam(required = false) String sourceId,
-            @RequestParam(required = false) String excerpt,
-            @RequestParam(required = false) String title) {
-
-        User currentUser = currentUserService.requireCurrentUser();
-        Claim claim = claimRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "Claim not found: " + id));
-        if (!claim.isActive()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Claim not found: " + id);
-        }
-        currentUserService.requireProjectWriteAccess(currentUser, claim.getProject());
-
-        boolean hasSourceId = sourceId != null && !sourceId.isBlank();
-        boolean hasExcerpt = excerpt != null && !excerpt.isBlank();
-        if (hasSourceId != hasExcerpt) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Manual analysis requires both sourceId and excerpt.");
-        }
-        boolean manualMode = hasSourceId && hasExcerpt;
-
-        Claim result;
-        if (manualMode) {
-            result = aiAnalysisService.analyzeAndPersist(claim, sourceId, excerpt, title);
-        } else {
-            result = aiAnalysisService.analyzeAndPersist(claim);
-        }
-        return ClaimResponseDto.fromEntity(result);
+    @GetMapping("/{id}/suggestions")
+    public List<AiSuggestionResponse> getSuggestions(@PathVariable UUID id) {
+        return claimService.getSuggestionsForClaim(id);
     }
 
-    @GetMapping("/{id}/matches")
-    public ClaimMatchResponse matches(
-            @PathVariable Integer id,
-            @RequestParam(defaultValue = "5") Integer topK) {
+    @PostMapping("/{id}/suggestions")
+    @ResponseStatus(HttpStatus.CREATED)
+    public AiSuggestionResponse createSuggestion(@PathVariable UUID id,
+                                                  @RequestParam UUID documentChunkId,
+                                                  @RequestParam Float score,
+                                                  @RequestParam String explanation) {
+        return claimService.createSuggestion(id, documentChunkId, score, explanation);
+    }
 
-        User currentUser = currentUserService.requireCurrentUser();
-        Claim claim = claimRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "Claim not found: " + id));
-        if (!claim.isActive()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Claim not found: " + id);
-        }
-        currentUserService.requireClaimAccess(currentUser, claim);
-        return claimMatchingService.matchClaim(claim, topK);
+    @PostMapping("/suggestions/{suggestionId}/accept")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void acceptSuggestion(@PathVariable UUID suggestionId) {
+        claimService.acceptSuggestion(suggestionId);
+    }
+
+    @PostMapping("/suggestions/{suggestionId}/reject")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void rejectSuggestion(@PathVariable UUID suggestionId) {
+        claimService.rejectSuggestion(suggestionId);
+    }
+
+    @GetMapping("/{id}/mappings")
+    public List<ClaimEvidenceMappingResponse> getMappings(@PathVariable UUID id) {
+        return claimService.getMappingsForClaim(id);
+    }
+
+    @GetMapping("/{id}/edges")
+    public List<EvidenceEdgeResponse> getEdges(@PathVariable UUID id) {
+        return claimService.getEdgesForClaim(id);
     }
 }

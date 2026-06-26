@@ -1,21 +1,19 @@
 package com.evidencepilot.controller;
 
-import com.evidencepilot.dto.response.PaperReviewResponse;
-import com.evidencepilot.model.Paper;
-import com.evidencepilot.model.PaperSection;
+import com.evidencepilot.dto.response.DocumentResponse;
+import com.evidencepilot.dto.response.PaperSectionResponse;
+import com.evidencepilot.model.Document;
 import com.evidencepilot.model.Project;
 import com.evidencepilot.model.User;
-import com.evidencepilot.dto.response.PaperResponseDto;
-import com.evidencepilot.dto.response.PaperSectionResponseDto;
-import com.evidencepilot.repository.PaperRepository;
+import com.evidencepilot.model.enums.DocumentType;
+import com.evidencepilot.repository.DocumentRepository;
 import com.evidencepilot.repository.PaperSectionRepository;
 import com.evidencepilot.repository.ProjectRepository;
 import com.evidencepilot.service.CurrentUserService;
+import com.evidencepilot.service.DocumentService;
 import com.evidencepilot.service.PaperProcessingService;
-import com.evidencepilot.service.SourceExtractionService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -23,137 +21,120 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
-/**
- * REST controller for Paper file uploads and CRUD operations.
- * Uploaded files are stored under the configured upload directory
- * and the resulting path is persisted to the DB.
- *
- * Base path: /api/papers
- */
 @RestController
 @RequestMapping("/api/papers")
 @RequiredArgsConstructor
 public class PaperController {
 
-    private final PaperRepository paperRepository;
+    private final DocumentRepository documentRepository;
     private final PaperSectionRepository paperSectionRepository;
     private final ProjectRepository projectRepository;
     private final CurrentUserService currentUserService;
-    private final SourceExtractionService sourceExtractionService;
     private final PaperProcessingService paperProcessingService;
-
-    /** Root directory where uploaded files are stored inside the container. */
-    @Value("${app.upload.dir:/app/uploads}")
-    private String uploadDir;
-
-    // ── Standard CRUD ──────────────────────────────────────────────────────────
+    private final DocumentService documentService;
 
     @GetMapping
-    public List<PaperResponseDto> findAll() {
+    public List<DocumentResponse> findAll() {
         User currentUser = currentUserService.requireCurrentUser();
-        List<Paper> papers;
+        List<Document> docs;
         if (currentUserService.isAdmin(currentUser)) {
-            papers = paperRepository.findByActiveTrue();
+            docs = documentRepository.findAll().stream()
+                    .filter(Document::isActive)
+                    .toList();
         } else {
-            papers = paperRepository.findByProjectStudentIdAndActiveTrue(currentUser.getId());
+            docs = documentRepository.findAll().stream()
+                    .filter(d -> d.isActive() && d.getProject() != null
+                            && d.getProject().getStudent() != null
+                            && d.getProject().getStudent().getId().equals(currentUser.getId()))
+                    .toList();
         }
-        return papers.stream().map(PaperResponseDto::fromEntity).toList();
+        return docs.stream().map(DocumentResponse::from).toList();
     }
 
     @GetMapping("/{id}")
-    public PaperResponseDto findById(@PathVariable Integer id) {
+    public DocumentResponse findById(@PathVariable UUID id) {
         User currentUser = currentUserService.requireCurrentUser();
-        Paper paper = paperRepository.findById(id)
+        Document doc = documentRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Paper not found: " + id));
-        if (!paper.isActive()) {
+        if (!doc.isActive()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Paper not found: " + id);
         }
-        currentUserService.requireProjectWriteAccess(currentUser, paper.getProject());
-        return PaperResponseDto.fromEntity(paper);
+        if (doc.getProject() != null) {
+            currentUserService.requireProjectWriteAccess(currentUser, doc.getProject());
+        }
+        return DocumentResponse.from(doc);
     }
 
     @GetMapping("/by-project/{projectId}")
-    public List<PaperResponseDto> findByProject(@PathVariable Integer projectId) {
+    public List<DocumentResponse> findByProject(@PathVariable UUID projectId) {
         User currentUser = currentUserService.requireCurrentUser();
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Project not found: " + projectId));
         currentUserService.requireProjectWriteAccess(currentUser, project);
-        return paperRepository.findByProjectIdAndActiveTrue(projectId).stream()
-                .map(PaperResponseDto::fromEntity)
+        return documentRepository.findByProjectId(projectId).stream()
+                .filter(Document::isActive)
+                .map(DocumentResponse::from)
                 .toList();
     }
 
     @GetMapping("/{id}/sections")
-    public List<PaperSectionResponseDto> sections(@PathVariable Integer id) {
+    public List<PaperSectionResponse> sections(@PathVariable UUID id) {
         User currentUser = currentUserService.requireCurrentUser();
-        Paper paper = paperRepository.findById(id)
+        Document doc = documentRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Paper not found: " + id));
-        if (!paper.isActive()) {
+        if (!doc.isActive()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Paper not found: " + id);
         }
-        currentUserService.requirePaperAccess(currentUser, paper);
-        return paperSectionRepository.findByPaperIdOrderBySectionIndex(id).stream()
-                .map(PaperSectionResponseDto::fromEntity)
+        currentUserService.requireProjectAccess(currentUser, doc.getProject());
+        return paperSectionRepository.findByDocumentIdOrderBySectionOrderAsc(id).stream()
+                .map(s -> new PaperSectionResponse(
+                        s.getId(), s.getDocument().getId(),
+                        s.getAssignedUser() != null ? s.getAssignedUser().getId() : null,
+                        s.getSectionOrder(), s.getSectionTitle(),
+                        s.getContentTex(), s.getContentMdCache(), s.getUpdatedAt()))
                 .toList();
     }
 
     @PostMapping("/{id}/review")
-    public PaperReviewResponse review(
-            @PathVariable Integer id,
+    public Map<String, Object> review(
+            @PathVariable UUID id,
             @RequestParam(required = false) String targetStyle) {
 
         User currentUser = currentUserService.requireCurrentUser();
-        Paper paper = paperRepository.findById(id)
+        Document doc = documentRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Paper not found: " + id));
-        if (!paper.isActive()) {
+        if (!doc.isActive()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Paper not found: " + id);
         }
-        currentUserService.requirePaperAccess(currentUser, paper);
-        return paperProcessingService.review(paper, targetStyle);
+        currentUserService.requireProjectAccess(currentUser, doc.getProject());
+        return paperProcessingService.review(doc, targetStyle);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Integer id) {
+    public ResponseEntity<Void> delete(@PathVariable UUID id) {
         User currentUser = currentUserService.requireCurrentUser();
-        Paper paper = paperRepository.findById(id)
+        Document doc = documentRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Paper not found: " + id));
-        currentUserService.requirePaperAccess(currentUser, paper);
-        paper.setActive(false);
-        paperRepository.save(paper);
+        currentUserService.requireProjectAccess(currentUser, doc.getProject());
+        doc.setActive(false);
+        documentRepository.save(doc);
         return ResponseEntity.noContent().build();
     }
 
-    // ── File upload ────────────────────────────────────────────────────────────
-
-    /**
-     * Uploads a paper (PDF/document) and links it to a project.
-     *
-     * <p>The file is stored at {@code <uploadDir>/papers/<uuid>_<originalName>}
-     * and the path is saved as {@code file_url} in the DB.  No hashing or
-     * deduplication is performed.</p>
-     *
-     * @param file      the multipart file
-     * @param projectId the project this paper belongs to (required)
-     */
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Transactional
-    public ResponseEntity<PaperResponseDto> upload(
+    public ResponseEntity<DocumentResponse> upload(
             @RequestParam("file") MultipartFile file,
-            @RequestParam("projectId") Integer projectId) {
+            @RequestParam("projectId") UUID projectId) {
 
         User currentUser = currentUserService.requireCurrentUser();
         Project project = projectRepository.findById(projectId)
@@ -161,48 +142,13 @@ public class PaperController {
                         "Project not found: " + projectId));
         currentUserService.requireProjectAccess(currentUser, project);
 
-        SourceExtractionService.ExtractedText extracted = sourceExtractionService.extractText(file);
-        String savedPath = storeFile(file, "papers");
+        DocumentResponse response = documentService.uploadDocument(projectId, file, DocumentType.STUDENT_SUBMISSION);
 
-        Paper paper = new Paper();
-        paper.setProject(project);
-        paper.setFileUrl(savedPath);
-        paper.setOriginalFilename(safeOriginalFilename(file));
-        paper.setContentType(file.getContentType());
-        paper.setFileSizeBytes(file.getSize());
-        paper.setExtractedText(extracted.text());
-        paper.setExtractionMethod(extracted.method());
-        paper.setSubmittedAt(LocalDateTime.now());
-
-        Paper saved = paperRepository.save(paper);
+        Document saved = documentRepository.findById(response.id())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                        "Saved document not found immediately after upload"));
         paperProcessingService.detectAndPersistSections(saved);
-        return ResponseEntity.status(HttpStatus.CREATED).body(PaperResponseDto.fromEntity(saved));
-    }
 
-    // ── Internal helpers ───────────────────────────────────────────────────────
-
-    private String storeFile(MultipartFile file, String subDir) {
-        try {
-            Path directory = Paths.get(uploadDir, subDir);
-            Files.createDirectories(directory);
-
-            String filename = UUID.randomUUID() + "_" + safeOriginalFilename(file);
-            Path destination = directory.resolve(filename);
-            Files.copy(file.getInputStream(), destination, StandardCopyOption.REPLACE_EXISTING);
-
-            return destination.toAbsolutePath().toString();
-        } catch (IOException e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
-                    "Failed to store file: " + e.getMessage(), e);
-        }
-    }
-
-    private String safeOriginalFilename(MultipartFile file) {
-        String original = file.getOriginalFilename();
-        if (original == null || original.isBlank()) {
-            return "uploaded-paper";
-        }
-        String filename = Paths.get(original).getFileName().toString();
-        return filename.replaceAll("[^A-Za-z0-9._-]", "_");
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 }

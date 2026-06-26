@@ -1,33 +1,26 @@
 package com.evidencepilot.dto.request;
 
-import com.evidencepilot.model.UserRole;
+import com.evidencepilot.model.enums.UserRole;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
 
-/**
- * Request DTO for user registration.
- *
- * <p>The frontend sends this payload to {@code POST /api/auth/register}.
- * All three fields are mandatory.</p>
- */
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
+@Getter
+@Setter
 public class RegisterRequest {
-
-    @NotBlank(message = "Email is required")
-    @Email(message = "Email must be valid")
+    @Email
+    @NotBlank
     private String email;
 
-    @NotBlank(message = "Password is required")
+    @NotBlank
     private String password;
 
-    @NotNull(message = "Role is required")
+    private String firstName;
+
+    private String lastName;
+
+    @NotNull
     private UserRole role;
 }

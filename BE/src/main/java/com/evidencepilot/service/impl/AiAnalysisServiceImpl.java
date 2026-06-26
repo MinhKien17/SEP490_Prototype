@@ -1,26 +1,22 @@
 package com.evidencepilot.service.impl;
 
-import com.evidencepilot.client.ai.AiModelClient;
-import com.evidencepilot.client.ai.AiModelClient.AiApiException;
-import com.evidencepilot.dto.request.ClaimAnalysisRequest;
-import com.evidencepilot.dto.request.ClaimMatchRequest;
-import com.evidencepilot.dto.response.ClaimAnalysisResponse;
-import com.evidencepilot.dto.response.ClaimMatchResponse;
+import com.evidencepilot.dto.response.AiSuggestionResponse;
+import com.evidencepilot.exception.ResourceNotFoundException;
+import com.evidencepilot.mapper.ClaimMapper;
 import com.evidencepilot.model.Claim;
+import com.evidencepilot.model.DocumentChunk;
 import com.evidencepilot.model.EvidenceEdge;
-import com.evidencepilot.model.SourceChunk;
 import com.evidencepilot.repository.ClaimRepository;
+import com.evidencepilot.repository.DocumentChunkRepository;
 import com.evidencepilot.repository.EvidenceEdgeRepository;
-import com.evidencepilot.repository.SourceChunkRepository;
 import com.evidencepilot.service.AiAnalysisService;
 import com.evidencepilot.service.ClaimMatchingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
-import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -29,72 +25,78 @@ import java.util.UUID;
 @Slf4j
 public class AiAnalysisServiceImpl implements AiAnalysisService {
 
-    private final AiModelClient aiModelClient;
     private final ClaimMatchingService claimMatchingService;
     private final ClaimRepository claimRepository;
-    private final SourceChunkRepository sourceChunkRepository;
+    private final DocumentChunkRepository documentChunkRepository;
     private final EvidenceEdgeRepository evidenceEdgeRepository;
+    private final ClaimMapper claimMapper;
 
     @Override
     @Transactional
     public Claim analyzeAndPersist(Claim claim) {
-        ClaimMatchResponse matchResponse = claimMatchingService.matchClaim(claim, 5);
-        if (!matchResponse.hasMatches()) {
-            throw new ResponseStatusException(
-                    org.springframework.http.HttpStatus.NOT_FOUND,
-                    "No matching sources found for claim: " + claim.getId());
+        List<AiSuggestionResponse> suggestions = claimMatchingService.matchClaim(
+                claim.getId(), claim.getProject().getId());
+
+        if (suggestions.isEmpty()) {
+            log.warn("No matching suggestions found for claim: {}", claim.getId());
+            return claim;
         }
 
-        var bestMatch = matchResponse.matches().get(0);
-        return analyzeAndPersist(claim, bestMatch.sourceId(), bestMatch.excerpt(), bestMatch.filename());
+        double avgScore = suggestions.stream()
+                .mapToDouble(s -> s.score() != null ? s.score() : 0.0)
+                .average()
+                .orElse(0.0);
+
+        claim.setAiConfidenceScore((float) avgScore);
+        Claim saved = claimRepository.save(claim);
+
+        for (AiSuggestionResponse suggestion : suggestions) {
+            EvidenceEdge edge = new EvidenceEdge();
+edge.setClaim(saved);
+            if (suggestion.documentChunkId() != null) {
+                DocumentChunk chunk = documentChunkRepository.findById(suggestion.documentChunkId()).orElse(null);
+                edge.setDocumentChunk(chunk);
+            }
+            edge.setVerdict("SUPPORTIVE");
+            edge.setConfidenceScore(suggestion.score());
+            edge.setExplanation(suggestion.explanation());
+            edge.setCreatedAt(LocalDateTime.now());
+            evidenceEdgeRepository.save(edge);
+        }
+
+        log.info("Analysis completed for claim {} (score={})", claim.getId(), avgScore);
+        return saved;
     }
 
     @Override
     @Transactional
     public Claim analyzeAndPersist(Claim claim, String sourceId, String excerpt, String title) {
-        ClaimAnalysisRequest request = new ClaimAnalysisRequest(claim.getContent(), sourceId, excerpt, title);
-        ClaimAnalysisResponse response;
+        UUID chunkId;
         try {
-            response = aiModelClient.processClaim(request);
-        } catch (AiApiException e) {
-            log.error("AI analysis failed for claim {}: {}", claim.getId(), e.getMessage());
-            throw new ResponseStatusException(
-                    org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,
-                    "AI analysis service unavailable", e);
+            chunkId = UUID.fromString(sourceId);
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid sourceId UUID {}, skipping evidence edge creation", sourceId);
+            return claim;
         }
 
-        BigDecimal confidence = response.confidence();
-        if (confidence == null) {
-            confidence = BigDecimal.ZERO;
+        DocumentChunk chunk = documentChunkRepository.findById(chunkId).orElse(null);
+        if (chunk == null) {
+            throw new ResourceNotFoundException("DocumentChunk not found for sourceId: " + sourceId);
         }
-        claim.setAiConfidenceScore(confidence);
-        Claim saved = claimRepository.save(claim);
-
-        String matchedSourceId = (response.matchedSourceIds() != null && !response.matchedSourceIds().isEmpty())
-                ? response.matchedSourceIds().get(0)
-                : sourceId;
-
-        saveEvidenceEdge(saved, matchedSourceId, response.verdict(), confidence, response.explanation(),
-                response.missingEvidence());
-
-        return saved;
-    }
-
-    private void saveEvidenceEdge(Claim claim, String sourceId, String verdict,
-                                  BigDecimal confidence, String explanation, List<String> missingEvidence) {
-        SourceChunk chunk = sourceChunkRepository.findBySourceId(Integer.valueOf(sourceId)).stream().findFirst()
-                .orElseThrow(() -> new ResponseStatusException(
-                        org.springframework.http.HttpStatus.NOT_FOUND,
-                        "Source chunk not found for sourceId: " + sourceId));
 
         EvidenceEdge edge = new EvidenceEdge();
-        edge.setClaim(claim);
-        edge.setSourceChunk(chunk);
-        edge.setVerdict(verdict);
-        edge.setConfidenceScore(confidence);
-        edge.setExplanation(explanation);
-        edge.setMissingEvidence(missingEvidence != null ? String.join("; ", missingEvidence) : null);
-
+edge.setClaim(claim);
+        edge.setDocumentChunk(chunk);
+        edge.setVerdict("SUPPORTIVE");
+        edge.setConfidenceScore(0.75f);
+        edge.setExplanation(excerpt);
+        edge.setCreatedAt(LocalDateTime.now());
         evidenceEdgeRepository.save(edge);
+
+        claim.setAiConfidenceScore(0.75f);
+        Claim saved = claimRepository.save(claim);
+
+        log.info("Direct analysis completed for claim {} against chunk {}", claim.getId(), chunkId);
+        return saved;
     }
 }

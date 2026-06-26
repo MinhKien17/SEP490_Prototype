@@ -1,21 +1,19 @@
 package com.evidencepilot.service.impl;
 
-import com.evidencepilot.client.ai.AiModelClient;
-import com.evidencepilot.client.ai.AiModelClient.AiApiException;
-import com.evidencepilot.dto.request.PaperReviewRequest;
-import com.evidencepilot.dto.response.PaperReviewResponse;
-import com.evidencepilot.model.Paper;
+import com.evidencepilot.infrastructure.AiModelClient;
+import com.evidencepilot.model.Document;
 import com.evidencepilot.model.PaperSection;
-import com.evidencepilot.repository.PaperRepository;
 import com.evidencepilot.repository.PaperSectionRepository;
 import com.evidencepilot.service.PaperProcessingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -25,40 +23,39 @@ import java.util.regex.Pattern;
 public class PaperProcessingServiceImpl implements PaperProcessingService {
 
     private final AiModelClient aiModelClient;
-    private final PaperRepository paperRepository;
     private final PaperSectionRepository paperSectionRepository;
 
     @Override
     @Transactional
-    public List<PaperSection> detectAndPersistSections(Paper paper) {
-        String text = paper.getExtractedText();
+    public List<PaperSection> detectAndPersistSections(Document document) {
+        String text = document.getDocumentText() != null
+                ? document.getDocumentText().getExtractedText() : null;
         if (text == null || text.isBlank()) {
             return List.of();
         }
 
-        List<PaperSection> sections = parseSections(text, paper);
+        List<PaperSection> sections = parseSections(text, document);
         return paperSectionRepository.saveAll(sections);
     }
 
     @Override
-    public PaperReviewResponse review(Paper paper, String targetStyle) {
-        String paperId = "paper-" + paper.getId();
-        PaperReviewRequest request = PaperReviewRequest.of(paperId, targetStyle, true);
+    public Map<String, Object> review(Document document, String targetStyle) {
+        String style = targetStyle != null ? targetStyle : "default";
         try {
-            return aiModelClient.reviewPaper(request);
-        } catch (AiApiException e) {
-            log.error("Paper review failed for paper {}: {}", paper.getId(), e.getMessage());
-            throw new ResponseStatusException(
+            return aiModelClient.reviewPaper(document.getId(), style, true);
+        } catch (AiModelClient.AiApiException e) {
+            log.error("Paper review failed for document {}: {}", document.getId(), e.getMessage());
+            throw new org.springframework.web.server.ResponseStatusException(
                     org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,
                     "Paper review service unavailable", e);
         }
     }
 
-    private List<PaperSection> parseSections(String text, Paper paper) {
+    private List<PaperSection> parseSections(String text, Document document) {
         Pattern pattern = Pattern.compile("(?m)^(?:#{1,6}\\s+)?([A-Z][A-Za-z\\s]+)\\s*\\n");
         Matcher matcher = pattern.matcher(text);
 
-        List<PaperSection> sections = new java.util.ArrayList<>();
+        List<PaperSection> sections = new ArrayList<>();
         int index = 0;
         int lastEnd = 0;
 
@@ -67,13 +64,13 @@ public class PaperProcessingServiceImpl implements PaperProcessingService {
             int start = matcher.start();
 
             if (index > 0) {
-                sections.get(index - 1).setText(text.substring(lastEnd, start).trim());
+                sections.get(index - 1).setContentTex(text.substring(lastEnd, start).trim());
             }
 
             PaperSection section = new PaperSection();
-            section.setPaper(paper);
-            section.setSectionIndex(index);
-            section.setName(sectionName);
+section.setDocument(document);
+            section.setSectionOrder(index);
+            section.setSectionTitle(sectionName);
             sections.add(section);
 
             lastEnd = matcher.end();
@@ -81,15 +78,15 @@ public class PaperProcessingServiceImpl implements PaperProcessingService {
         }
 
         if (!sections.isEmpty()) {
-            sections.get(sections.size() - 1).setText(text.substring(lastEnd).trim());
+            sections.get(sections.size() - 1).setContentTex(text.substring(lastEnd).trim());
         }
 
         if (sections.isEmpty()) {
             PaperSection section = new PaperSection();
-            section.setPaper(paper);
-            section.setSectionIndex(0);
-            section.setName("Full Text");
-            section.setText(text);
+section.setDocument(document);
+            section.setSectionOrder(0);
+            section.setSectionTitle("Full Text");
+            section.setContentTex(text);
             sections.add(section);
         }
 

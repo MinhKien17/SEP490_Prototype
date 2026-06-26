@@ -85,11 +85,11 @@ public class QdrantClient {
     }
 
     /**
-     * Upserts a single point scoped to either a project or an instructor dataset.
+     * Upserts a single point scoped to either a project or an instructor collection.
      *
      * @param chunkId   the MySQL {@code source_chunks.id} (must be numeric)
      * @param embedding the dense vector produced by the embedding model
-     * @param scopeType {@code PROJECT}, {@code DATASET}, or another uppercase scope label
+     * @param scopeType {@code PROJECT}, {@code COLLECTION}, or another uppercase scope label
      * @param scopeId   the corresponding relational ID as a string
      */
     public void upsertVector(String chunkId, List<Float> embedding, String scopeType, String scopeId) {
@@ -103,8 +103,8 @@ public class QdrantClient {
         if ("PROJECT".equals(normalizedScopeType)) {
             payload.put("project_id", normalizedScopeId);
         }
-        if ("DATASET".equals(normalizedScopeType)) {
-            payload.put("dataset_id", normalizedScopeId);
+        if ("COLLECTION".equals(normalizedScopeType)) {
+            payload.put("collection_id", normalizedScopeId);
         }
 
         Map<String, Object> point = Map.of(
@@ -151,10 +151,10 @@ public class QdrantClient {
     }
 
     /**
-     * Finds closest chunk vectors inside a project or dataset scope.
+     * Finds closest chunk vectors inside a project or collection scope.
      *
      * @param queryVector the dense vector for the search query
-     * @param scopeType   {@code PROJECT} or {@code DATASET}
+     * @param scopeType   {@code PROJECT} or {@code COLLECTION}
      * @param scopeId     the corresponding relational ID as a string
      * @param topK        number of nearest chunks to return, clamped to 1..20
      * @return ordered chunk IDs with Qdrant similarity scores

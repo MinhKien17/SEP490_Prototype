@@ -1,5 +1,7 @@
 package com.evidencepilot.config.security;
 
+import com.evidencepilot.model.User;
+import com.evidencepilot.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,15 +17,14 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
-/**
- * Intercepts requests once and authenticates a valid JWT bearer token.
- */
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private final JwtUtil jwtUtil;
+    private final JwtUtils jwtUtils;
+    private final UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -31,38 +32,38 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     FilterChain filterChain)
             throws ServletException, IOException {
 
-        final String authHeader = request.getHeader("Authorization");
+        String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        final String token = authHeader.substring(7);
-        if (!jwtUtil.validateToken(token)) {
+        String token = authHeader.substring(7);
+        if (!jwtUtils.validateToken(token)) {
             filterChain.doFilter(request, response);
             return;
         }
 
         if (SecurityContextHolder.getContext().getAuthentication() == null) {
-            String email = jwtUtil.extractEmail(token);
-            String role = jwtUtil.extractRole(token);
-            String normalizedRole = role == null || role.isBlank()
-                    ? "STUDENT"
-                    : role.trim();
-            String authority = normalizedRole.startsWith("ROLE_")
-                    ? normalizedRole
-                    : "ROLE_" + normalizedRole.toUpperCase(Locale.ROOT);
+            UUID userId = jwtUtils.extractUserId(token);
+            User user = userRepository.findById(userId).orElse(null);
+            if (user == null) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            String role = jwtUtils.extractRole(token);
+            String authority = role == null || role.isBlank()
+                    ? "ROLE_STUDENT"
+                    : (role.startsWith("ROLE_") ? role : "ROLE_" + role.toUpperCase(Locale.ROOT));
 
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(
-                            email,
-                            null,
-                            List.of(new SimpleGrantedAuthority(authority))
-                    );
+                            user, null,
+                            List.of(new SimpleGrantedAuthority(authority)));
 
             authentication.setDetails(
-                    new WebAuthenticationDetailsSource().buildDetails(request)
-            );
+                    new WebAuthenticationDetailsSource().buildDetails(request));
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
         }

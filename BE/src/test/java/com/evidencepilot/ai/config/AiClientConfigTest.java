@@ -1,6 +1,7 @@
 package com.evidencepilot.ai.config;
 
-import com.evidencepilot.client.ai.AiModelClient;
+import com.evidencepilot.infrastructure.AiModelClient;
+import com.evidencepilot.client.ai.config.AiClientConfig;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;

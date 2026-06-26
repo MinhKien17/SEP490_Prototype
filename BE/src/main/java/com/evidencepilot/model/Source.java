@@ -1,26 +1,24 @@
 package com.evidencepilot.model;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
 
-/**
- * Represents an uploaded source file that can belong to a project or a dataset.
- * Both {@code project_id} and {@code dataset_id} are nullable (one may be absent).
- * Maps to the {@code sources} table.
- */
+import java.util.UUID;
+
+import org.hibernate.annotations.JdbcTypeCode;
+
 @Entity
 @Table(name = "sources")
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+@Getter
+@Setter
 public class Source {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id")
-    private Integer id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "id", columnDefinition = "BINARY(16)")
+    @JdbcTypeCode(java.sql.Types.BINARY)
+    private UUID id;
 
     @Column(name = "file_url", nullable = false)
     private String fileUrl;
@@ -43,30 +41,31 @@ public class Source {
     @Column(name = "extraction_method", length = 50)
     private String extractionMethod;
 
-    /**
-     * The project this source belongs to (nullable).
-     * Foreign key: sources.project_id → projects.id
-     */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "project_id")
+    @JoinColumn(name = "project_id", columnDefinition = "BINARY(16)", referencedColumnName = "id")
     @com.fasterxml.jackson.annotation.JsonIgnore
     private Project project;
 
-    /**
-     * The dataset this source belongs to (nullable).
-     * Foreign key: sources.dataset_id → datasets.id
-     */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "dataset_id")
+    @JoinColumn(name = "collection_id", columnDefinition = "BINARY(16)", referencedColumnName = "id")
     @com.fasterxml.jackson.annotation.JsonIgnore
-    private Dataset dataset;
+    private Collection collection;
 
-    /**
-     * The user who uploaded this source.
-     * Foreign key: sources.uploaded_by → users.id
-     */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "uploaded_by", nullable = false)
+    @JoinColumn(name = "uploaded_by", columnDefinition = "BINARY(16)", referencedColumnName = "id", nullable = false)
     @com.fasterxml.jackson.annotation.JsonIgnore
     private User uploadedBy;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Source source = (Source) o;
+        return id.equals(source.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return id.hashCode();
+    }
 }

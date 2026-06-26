@@ -1,22 +1,27 @@
 package com.evidencepilot.dto.response;
 
 import com.evidencepilot.model.User;
-import com.evidencepilot.model.UserRole;
+import com.evidencepilot.model.enums.UserRole;
+import lombok.Builder;
+import lombok.Getter;
+import java.util.UUID;
 
-import java.time.LocalDateTime;
+@Getter
+@Builder
+public class UserResponse {
+    private final UUID id;
+    private final String email;
+    private final UserRole role;
+    private final String firstName;
+    private final String lastName;
 
-public record UserResponse(
-        Integer id,
-        String email,
-        UserRole role,
-        LocalDateTime createdAt
-) {
     public static UserResponse from(User user) {
-        return new UserResponse(
-                user.getId(),
-                user.getEmail(),
-                user.getRole(),
-                user.getCreatedAt()
-        );
+        return UserResponse.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .role(user.getRole())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .build();
     }
 }

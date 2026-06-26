@@ -1,49 +1,33 @@
 package com.evidencepilot.model;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
-/**
- * Stores the actual feedback content written by an instructor in response
- * to a {@link FeedbackRequest}.
- *
- * <p>DBML defines a one-to-one relationship between
- * {@code instructor_feedbacks} and {@code feedback_requests} (dash notation).</p>
- *
- * Maps to the {@code instructor_feedbacks} table.
- */
+import org.hibernate.annotations.JdbcTypeCode;
+
 @Entity
 @Table(name = "instructor_feedbacks")
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+@Getter
+@Setter
 public class InstructorFeedback {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id")
-    private Integer id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "id", columnDefinition = "BINARY(16)")
+    @JdbcTypeCode(java.sql.Types.BINARY)
+    private UUID id;
 
-    /**
-     * The feedback request this response corresponds to.
-     * One-to-one per DBML dash notation.
-     * Foreign key: instructor_feedbacks.request_id → feedback_requests.id
-     */
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "request_id", nullable = false, unique = true)
+    @JoinColumn(name = "request_id", columnDefinition = "BINARY(16)", referencedColumnName = "id", nullable = false, unique = true)
     @com.fasterxml.jackson.annotation.JsonIgnore
     private FeedbackRequest request;
 
-    /**
-     * The instructor who authored this feedback.
-     * Foreign key: instructor_feedbacks.instructor_id → users.id
-     */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "instructor_id", nullable = false)
+    @JoinColumn(name = "instructor_id", columnDefinition = "BINARY(16)", referencedColumnName = "id", nullable = false)
     @com.fasterxml.jackson.annotation.JsonIgnore
     private User instructor;
 
@@ -52,4 +36,17 @@ public class InstructorFeedback {
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        InstructorFeedback that = (InstructorFeedback) o;
+        return id.equals(that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return id.hashCode();
+    }
 }

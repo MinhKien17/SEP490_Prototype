@@ -1,34 +1,28 @@
 package com.evidencepilot.model;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
-/**
- * Represents a paper (PDF/document) submitted for a project.
- * Maps to the {@code papers} table.
- */
+import org.hibernate.annotations.JdbcTypeCode;
+
 @Entity
 @Table(name = "papers")
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+@Getter
+@Setter
 public class Paper {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id")
-    private Integer id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "id", columnDefinition = "BINARY(16)")
+    @JdbcTypeCode(java.sql.Types.BINARY)
+    private UUID id;
 
-    /**
-     * The project this paper belongs to.
-     * Foreign key: papers.project_id → projects.id
-     */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "project_id", nullable = false)
+    @JoinColumn(name = "project_id", columnDefinition = "BINARY(16)", referencedColumnName = "id", nullable = false)
     @com.fasterxml.jackson.annotation.JsonIgnore
     private Project project;
 
@@ -55,4 +49,17 @@ public class Paper {
 
     @Column(name = "submitted_at")
     private LocalDateTime submittedAt;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Paper paper = (Paper) o;
+        return id.equals(paper.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return id.hashCode();
+    }
 }

@@ -5,13 +5,14 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.UUID;
 
 @Repository
-public interface SourceReferenceRepository extends JpaRepository<SourceReference, Integer> {
+public interface SourceReferenceRepository extends JpaRepository<SourceReference, UUID> {
 
-    List<SourceReference> findBySourceIdOrderByReferenceIndex(Integer sourceId);
+    List<SourceReference> findBySourceIdOrderByReferenceIndex(UUID sourceId);
 
-    List<SourceReference> findBySourceProjectIdOrderBySourceIdAscReferenceIndexAsc(Integer projectId);
+    List<SourceReference> findBySourceProjectIdOrderBySourceIdAscReferenceIndexAsc(UUID projectId);
 
-    List<SourceReference> findBySourceProjectIdAndSourceActiveTrueOrderBySourceIdAscReferenceIndexAsc(Integer projectId);
+    List<SourceReference> findBySourceProjectIdAndSourceActiveTrueOrderBySourceIdAscReferenceIndexAsc(UUID projectId);
 }

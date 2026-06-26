@@ -1,58 +1,82 @@
 package com.evidencepilot.model;
 
-import com.evidencepilot.model.ProjectStatus;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
 
-/**
- * Represents a student's research project.
- * Maps to the {@code projects} table.
- *
- * <p>
- * {@code createdAt} is populated automatically by Hibernate's
- * {@link CreationTimestamp} on first persist — no manual setter needed.
- * </p>
- */
+import org.hibernate.annotations.JdbcTypeCode;
+
+import lombok.Getter;
+import lombok.Setter;
+import com.evidencepilot.model.enums.ProjectStatus;
+import com.evidencepilot.model.enums.ProjectRole;
+
 @Entity
 @Table(name = "projects")
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+@Getter
+@Setter
 public class Project {
-
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id")
-    private Integer id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "id", columnDefinition = "BINARY(16)")
+    @JdbcTypeCode(java.sql.Types.BINARY)
+    private UUID id;
 
-    /**
-     * The student who owns this project.
-     * Foreign key: projects.student_id → users.id
-     */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "student_id", nullable = false)
-    @com.fasterxml.jackson.annotation.JsonIgnore
-    private User student;
-
-    @Column(name = "title")
+    @Column(nullable = false)
     private String title;
 
-    @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 20)
-    private ProjectStatus status = ProjectStatus.DRAFT;
+    private ProjectStatus status;
 
-    @Column(name = "active", nullable = false)
+    private String targetStandard;
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    @Column(nullable = false)
     private boolean active = true;
 
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
+    @OneToMany(mappedBy = "project")
+    private List<ProjectMember> projectMembers;
+
+    @OneToMany(mappedBy = "project")
+    private List<Document> projectDocuments;
+
+    @OneToMany(mappedBy = "project")
+    private List<ProjectMedia> projectMedia;
+
+    @OneToMany(mappedBy = "project")
+    private List<Claim> claims;
+
+    public User getStudent() {
+        if (projectMembers == null) {
+            return null;
+        }
+        return projectMembers.stream()
+                .filter(member -> member.getRole() == ProjectRole.OWNER)
+                .map(ProjectMember::getUser)
+                .findFirst()
+                .orElse(null);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
+        Project project = (Project) o;
+        return id.equals(project.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return id.hashCode();
+    }
 }

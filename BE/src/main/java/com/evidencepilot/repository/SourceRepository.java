@@ -6,31 +6,28 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
-public interface SourceRepository extends JpaRepository<Source, Integer> {
+public interface SourceRepository extends JpaRepository<Source, UUID> {
 
-    List<Source> findByProjectId(Integer projectId);
+    List<Source> findByProjectId(UUID projectId);
 
-    List<Source> findByDatasetId(Integer datasetId);
+    List<Source> findByCollectionId(UUID collectionId);
 
-    List<Source> findByUploadedById(Integer userId);
+    List<Source> findByUploadedById(UUID userId);
 
-    List<Source> findByProjectStudentId(Integer studentId);
-
-    List<Source> findByDatasetInstructorId(Integer instructorId);
+    List<Source> findByCollectionInstructorId(UUID instructorId);
 
     List<Source> findByActiveTrue();
 
-    List<Source> findByProjectIdAndActiveTrue(Integer projectId);
+    List<Source> findByProjectIdAndActiveTrue(UUID projectId);
 
-    List<Source> findByDatasetIdAndActiveTrue(Integer datasetId);
+    List<Source> findByCollectionIdAndActiveTrue(UUID collectionId);
 
-    List<Source> findByProjectStudentIdAndActiveTrue(Integer studentId);
+    List<Source> findByCollectionInstructorIdAndActiveTrue(UUID instructorId);
 
-    List<Source> findByDatasetInstructorIdAndActiveTrue(Integer instructorId);
+    Optional<Source> findByIdAndProjectId(UUID id, UUID projectId);
 
-    Optional<Source> findByIdAndProjectId(Integer id, Integer projectId);
-
-    Optional<Source> findByIdAndProjectIdAndActiveTrue(Integer id, Integer projectId);
+    Optional<Source> findByIdAndProjectIdAndActiveTrue(UUID id, UUID projectId);
 }

@@ -5,17 +5,14 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.UUID;
 
 @Repository
-public interface PaperRepository extends JpaRepository<Paper, Integer> {
+public interface PaperRepository extends JpaRepository<Paper, UUID> {
 
-    List<Paper> findByProjectId(Integer projectId);
-
-    List<Paper> findByProjectStudentId(Integer studentId);
+    List<Paper> findByProjectId(UUID projectId);
 
     List<Paper> findByActiveTrue();
 
-    List<Paper> findByProjectIdAndActiveTrue(Integer projectId);
-
-    List<Paper> findByProjectStudentIdAndActiveTrue(Integer studentId);
+    List<Paper> findByProjectIdAndActiveTrue(UUID projectId);
 }

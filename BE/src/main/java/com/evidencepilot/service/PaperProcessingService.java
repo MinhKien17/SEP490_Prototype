@@ -1,14 +1,13 @@
 package com.evidencepilot.service;
 
-import com.evidencepilot.model.Paper;
+import com.evidencepilot.model.Document;
 import com.evidencepilot.model.PaperSection;
-import com.evidencepilot.dto.response.PaperReviewResponse;
-
 import java.util.List;
+import java.util.Map;
 
 public interface PaperProcessingService {
 
-    List<PaperSection> detectAndPersistSections(Paper paper);
+    List<PaperSection> detectAndPersistSections(Document document);
 
-    PaperReviewResponse review(Paper paper, String targetStyle);
+    Map<String, Object> review(Document document, String targetStyle);
 }

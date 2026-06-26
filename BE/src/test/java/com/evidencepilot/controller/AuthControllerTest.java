@@ -1,86 +1,99 @@
 package com.evidencepilot.controller;
 
-import com.evidencepilot.config.security.JwtUtil;
-import com.evidencepilot.model.User;
-import com.evidencepilot.model.UserRole;
 import com.evidencepilot.dto.request.LoginRequest;
-import com.evidencepilot.dto.request.RegisterRequest;
+import com.evidencepilot.model.User;
+import com.evidencepilot.model.enums.UserRole;
 import com.evidencepilot.repository.UserRepository;
+import io.minio.MinioClient;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpStatus;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Optional;
+import java.time.LocalDateTime;
+import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.hamcrest.Matchers.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@AutoConfigureMockMvc
+@Transactional
 class AuthControllerTest {
 
-    private final UserRepository userRepository = mock(UserRepository.class);
-    private final JwtUtil jwtUtil = new JwtUtil("EvidencePilot-Test-Secret-Key-For-Jwt!!", 86_400_000L);
-    private final AuthController controller = new AuthController(userRepository, new BCryptPasswordEncoder(), jwtUtil);
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @MockBean
+    private MinioClient minioClient;
+
+    @MockBean
+    private RabbitTemplate rabbitTemplate;
 
     @Test
-    void registerCreatesRequestedRoleAndDoesNotExposePasswordHash() {
-        RegisterRequest request = new RegisterRequest();
-        request.setEmail("student@example.com");
-        request.setPassword("Passw0rd!");
-        request.setRole(UserRole.STUDENT);
+    void register_shouldReturnAuthResponseWithValidUuid() throws Exception {
+        String body = """
+                {
+                    "email": "newuser@test.com",
+                    "password": "StrongPass1!",
+                    "firstName": "Jane",
+                    "lastName": "Doe",
+                    "role": "STUDENT"
+                }
+                """;
 
-        when(userRepository.existsByEmail("student@example.com")).thenReturn(false);
-        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
-            User saved = invocation.getArgument(0);
-            saved.setId(7);
-            assertThat(saved.getRole()).isEqualTo(UserRole.STUDENT);
-            assertThat(saved.getPasswordHash()).startsWith("$2");
-            return saved;
-        });
-
-        var response = controller.register(request);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).containsEntry("email", "student@example.com");
-        assertThat(response.getBody()).containsEntry("role", UserRole.STUDENT.name());
-        assertThat(response.getBody()).doesNotContainKey("passwordHash");
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token", not(blankString())))
+                .andExpect(jsonPath("$.user.id", matchesPattern(
+                        "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")))
+                .andExpect(jsonPath("$.user.email", is("newuser@test.com")))
+                .andExpect(jsonPath("$.user.role", is("STUDENT")));
     }
 
     @Test
-    void registerRejectsDuplicateEmailBeforeSaving() {
-        RegisterRequest request = new RegisterRequest();
-        request.setEmail("student@example.com");
-        request.setPassword("Passw0rd!");
-        request.setRole(UserRole.STUDENT);
+    void login_shouldReturnValidJwt() throws Exception {
+        String email = "loginuser@test.com";
+        String rawPassword = "ValidPass1!";
 
-        when(userRepository.existsByEmail("student@example.com")).thenReturn(true);
-
-        assertThatThrownBy(() -> controller.register(request))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-                .isEqualTo(HttpStatus.CONFLICT);
-    }
-
-    @Test
-    void loginTokenCarriesActualUserRole() {
         User user = new User();
-        user.setId(7);
-        user.setEmail("instructor@example.com");
+        user.setEmail(email);
+        user.setPasswordHash(passwordEncoder.encode(rawPassword));
         user.setRole(UserRole.INSTRUCTOR);
-        user.setPasswordHash(new BCryptPasswordEncoder().encode("Passw0rd!"));
-
-        when(userRepository.findByEmail("instructor@example.com")).thenReturn(Optional.of(user));
+        user.setFirstName("John");
+        user.setLastName("Smith");
+        user.setCreatedAt(LocalDateTime.now());
+        userRepository.saveAndFlush(user);
 
         LoginRequest request = new LoginRequest();
-        request.setEmail("instructor@example.com");
-        request.setPassword("Passw0rd!");
+        request.setEmail(email);
+        request.setPassword(rawPassword);
+        String body = new com.fasterxml.jackson.databind.ObjectMapper()
+                .writeValueAsString(request);
 
-        var response = controller.login(request);
-
-        assertThat(jwtUtil.extractRole(response.getBody().getToken()))
-                .isEqualTo(UserRole.INSTRUCTOR.name());
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token", not(blankString())))
+                .andExpect(jsonPath("$.user.id", matchesPattern(
+                        "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")))
+                .andExpect(jsonPath("$.user.email", is(email)))
+                .andExpect(jsonPath("$.user.role", is("INSTRUCTOR")));
     }
 }

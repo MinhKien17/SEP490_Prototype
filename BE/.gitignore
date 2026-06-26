@@ -24,3 +24,4 @@ uploads/
 # ── Agent skill definitions (local dev only) ─────────────────────
 .skills/
 .opencode.json
+opencode.json

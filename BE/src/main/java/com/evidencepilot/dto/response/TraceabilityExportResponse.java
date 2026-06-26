@@ -1,60 +1,55 @@
 package com.evidencepilot.dto.response;
 
 import com.evidencepilot.model.FeedbackStatus;
-import com.evidencepilot.model.ProjectStatus;
-
-import java.math.BigDecimal;
+import com.evidencepilot.model.enums.ProjectStatus;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public record TraceabilityExportResponse(
-        Integer projectId,
-        String projectTitle,
-        ProjectStatus projectStatus,
-        Instant generatedAt,
-        List<TraceabilityClaim> claims,
-        List<TraceabilitySource> sources,
-        List<TraceabilityFeedback> feedback
+    UUID projectId,
+    String projectTitle,
+    ProjectStatus projectStatus,
+    Instant generatedAt,
+    List<TraceabilityClaim> claims,
+    List<TraceabilitySource> sources,
+    List<TraceabilityFeedback> feedback
 ) {
     public record TraceabilityClaim(
-            Integer claimId,
-            String content,
-            BigDecimal confidence,
-            Map<String, Object> graphData,
-            List<TraceabilityMatch> matches
-    ) {
-    }
+        UUID id,
+        String content,
+        Float aiConfidenceScore,
+        Map<String, Object> graphData,
+        List<TraceabilityMatch> matches
+    ) {}
 
     public record TraceabilityMatch(
-            String sourceId,
-            String filename,
-            String chunkId,
-            Integer page,
-            String excerpt,
-            BigDecimal score,
-            String suitability,
-            String explanation,
-            String citationTitle,
-            String citationYear,
-            String citationRawText
-    ) {
-    }
+        String sourceId,
+        String filename,
+        UUID chunkId,
+        Integer page,
+        String excerpt,
+        Float score,
+        String suitability,
+        String explanation,
+        String referenceTitle,
+        String referenceYear,
+        String referenceText
+    ) {}
 
     public record TraceabilitySource(
-            Integer sourceId,
-            String filename,
-            String contentType,
-            Long fileSizeBytes,
-            String fileUrl,
-            int referenceCount
-    ) {
-    }
+        UUID id,
+        String filename,
+        String contentType,
+        Long fileSizeBytes,
+        String fileUrl,
+        int referenceCount
+    ) {}
 
     public record TraceabilityFeedback(
-            Integer requestId,
-            Integer instructorId,
-            FeedbackStatus status
-    ) {
-    }
+        UUID id,
+        UUID instructorId,
+        FeedbackStatus status
+    ) {}
 }

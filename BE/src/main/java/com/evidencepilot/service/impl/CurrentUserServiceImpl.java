@@ -1,12 +1,11 @@
 package com.evidencepilot.service.impl;
 
 import com.evidencepilot.model.Claim;
-import com.evidencepilot.model.Dataset;
 import com.evidencepilot.model.Paper;
 import com.evidencepilot.model.Project;
 import com.evidencepilot.model.Source;
 import com.evidencepilot.model.User;
-import com.evidencepilot.model.UserRole;
+import com.evidencepilot.model.enums.UserRole;
 import com.evidencepilot.repository.UserRepository;
 import com.evidencepilot.service.CurrentUserService;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +14,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -26,10 +25,13 @@ public class CurrentUserServiceImpl implements CurrentUserService {
     @Override
     public User requireCurrentUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || auth.getName() == null) {
+        if (auth == null || auth.getPrincipal() == null) {
             throw new ResponseStatusException(
                     org.springframework.http.HttpStatus.UNAUTHORIZED,
                     "No authenticated user found");
+        }
+        if (auth.getPrincipal() instanceof User user) {
+            return user;
         }
         String email = auth.getName();
         return userRepository.findByEmail(email)
@@ -49,7 +51,7 @@ public class CurrentUserServiceImpl implements CurrentUserService {
     }
 
     @Override
-    public boolean ownsUserIdOrAdmin(User currentUser, Integer userId) {
+    public boolean ownsUserIdOrAdmin(User currentUser, UUID userId) {
         return isAdmin(currentUser) || currentUser.getId().equals(userId);
     }
 
@@ -63,7 +65,7 @@ public class CurrentUserServiceImpl implements CurrentUserService {
     }
 
     @Override
-    public void requireUserIdOrAdmin(User currentUser, Integer userId) {
+    public void requireUserIdOrAdmin(User currentUser, UUID userId) {
         if (!ownsUserIdOrAdmin(currentUser, userId)) {
             throw new ResponseStatusException(
                     org.springframework.http.HttpStatus.FORBIDDEN,
@@ -73,7 +75,8 @@ public class CurrentUserServiceImpl implements CurrentUserService {
 
     @Override
     public void requireProjectAccess(User currentUser, Project project) {
-        if (isAdmin(currentUser)) return;
+        if (isAdmin(currentUser))
+            return;
         if (isInstructor(currentUser)) {
             if (!project.getStudent().getId().equals(currentUser.getId())) {
                 throw new ResponseStatusException(
@@ -91,7 +94,8 @@ public class CurrentUserServiceImpl implements CurrentUserService {
 
     @Override
     public void requireProjectWriteAccess(User currentUser, Project project) {
-        if (isAdmin(currentUser)) return;
+        if (isAdmin(currentUser))
+            return;
         if (isInstructor(currentUser)) {
             throw new ResponseStatusException(
                     org.springframework.http.HttpStatus.FORBIDDEN,
@@ -105,19 +109,20 @@ public class CurrentUserServiceImpl implements CurrentUserService {
     }
 
     @Override
-    public void requireDatasetAccess(User currentUser, Dataset dataset) {
-        if (isAdmin(currentUser)) return;
+    public void requireCollectionAccess(User currentUser, com.evidencepilot.model.Collection collection) {
+        if (isAdmin(currentUser))
+            return;
         if (isInstructor(currentUser)) {
-            if (!dataset.getInstructor().getId().equals(currentUser.getId())) {
+            if (!collection.getInstructor().getId().equals(currentUser.getId())) {
                 throw new ResponseStatusException(
                         org.springframework.http.HttpStatus.FORBIDDEN,
-                        "Instructor access denied to dataset");
+                        "Instructor access denied to collection");
             }
             return;
         }
         throw new ResponseStatusException(
                 org.springframework.http.HttpStatus.FORBIDDEN,
-                "Students cannot access datasets");
+                "Students cannot access collections");
     }
 
     @Override
@@ -134,12 +139,12 @@ public class CurrentUserServiceImpl implements CurrentUserService {
     public void requireSourceAccess(User currentUser, Source source) {
         if (source.getProject() != null) {
             requireProjectAccess(currentUser, source.getProject());
-        } else if (source.getDataset() != null) {
-            requireDatasetAccess(currentUser, source.getDataset());
+        } else if (source.getCollection() != null) {
+            requireCollectionAccess(currentUser, source.getCollection());
         } else {
             throw new ResponseStatusException(
                     org.springframework.http.HttpStatus.FORBIDDEN,
-                    "Source not associated with project or dataset");
+                    "Source not associated with project or collection");
         }
     }
 }
