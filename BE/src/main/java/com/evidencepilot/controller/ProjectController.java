@@ -6,8 +6,9 @@ import com.evidencepilot.dto.response.ClaimResponse;
 import com.evidencepilot.dto.response.CollectionResponse;
 import com.evidencepilot.dto.response.DocumentResponse;
 import com.evidencepilot.dto.response.PagedResponse;
+import com.evidencepilot.dto.response.ProjectMemberResponse;
 import com.evidencepilot.dto.response.ProjectResponse;
-import com.evidencepilot.model.ProjectMember;
+import com.evidencepilot.mapper.ProjectMapper;
 import com.evidencepilot.model.enums.DocumentType;
 import com.evidencepilot.model.enums.ProcessingStatus;
 import com.evidencepilot.model.enums.ProjectRole;
@@ -48,6 +49,7 @@ public class ProjectController {
     private final DocumentService documentService;
     private final ClaimService claimService;
     private final CollectionService collectionService;
+    private final ProjectMapper projectMapper;
 
     @Operation(summary = "List all projects",
             description = "Returns all active projects accessible to the current user. "
@@ -133,9 +135,11 @@ public class ProjectController {
             @ApiResponse(responseCode = "404", description = "Project not found")
     })
     @GetMapping("/{id}/members")
-    public List<ProjectMember> getProjectMembers(
+    public List<ProjectMemberResponse> getProjectMembers(
             @Parameter(description = "Project UUID") @PathVariable UUID id) {
-        return projectService.getProjectMembers(id);
+        return projectService.getProjectMembers(id).stream()
+                .map(projectMapper::toProjectMemberResponse)
+                .toList();
     }
 
     @Operation(summary = "List project documents",

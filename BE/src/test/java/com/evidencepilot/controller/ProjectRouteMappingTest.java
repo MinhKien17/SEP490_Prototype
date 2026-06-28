@@ -2,8 +2,12 @@ package com.evidencepilot.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.evidencepilot.dto.response.ProjectMemberResponse;
+
+import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -40,6 +44,15 @@ class ProjectRouteMappingTest {
                 "/api/sources/api/projects/{projectId}/sources",
                 "/api/claims/api/projects/{projectId}/claims",
                 "/api/collections/api/projects/{projectId}/collections");
+    }
+
+    @Test
+    void projectMembersRouteReturnsDtoInsteadOfJpaEntity() throws NoSuchMethodException {
+        Method method = ProjectController.class.getDeclaredMethod("getProjectMembers", java.util.UUID.class);
+
+        assertThat(method.getReturnType()).isEqualTo(List.class);
+        ParameterizedType returnType = (ParameterizedType) method.getGenericReturnType();
+        assertThat(returnType.getActualTypeArguments()[0]).isEqualTo(ProjectMemberResponse.class);
     }
 
     private static Set<String> controllerPaths(Class<?> controller) {
