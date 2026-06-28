@@ -30,7 +30,7 @@ public class QdrantGateway {
         );
 
         QdrantSearchResponse response = restClient.post()
-                .uri("/collections/evidence_chunks/points/search")
+                .uri("/collections/source_chunks/points/search")
                 .body(request)
                 .retrieve()
                 .body(QdrantSearchResponse.class);

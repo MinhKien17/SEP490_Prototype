@@ -17,7 +17,7 @@ public record QdrantSearchRequest(
     public static QdrantSearchRequest forDocument(String documentId, List<Float> queryVector, int limit) {
         return new QdrantSearchRequest(
                 queryVector,
-                new Filter(List.of(new Condition("documentId", new Match(documentId)))),
+                new Filter(List.of(new Condition("document_id", new Match(documentId)))),
                 limit,
                 true,
                 false
