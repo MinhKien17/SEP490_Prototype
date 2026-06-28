@@ -7,6 +7,7 @@ import com.evidencepilot.model.AiSuggestion;
 import com.evidencepilot.model.Claim;
 import com.evidencepilot.model.Document;
 import com.evidencepilot.model.DocumentChunk;
+import com.evidencepilot.model.enums.DocumentType;
 import com.evidencepilot.model.enums.SuggestionStatus;
 import com.evidencepilot.repository.AiSuggestionRepository;
 import com.evidencepilot.repository.ClaimRepository;
@@ -41,6 +42,7 @@ public class ClaimMatchingServiceImpl implements ClaimMatchingService {
 
         List<Document> projectDocuments = documentRepository.findByProjectId(projectId);
         List<DocumentChunk> chunks = projectDocuments.stream()
+                .filter(doc -> doc.isActive() && doc.getDocType() == DocumentType.SOURCE)
                 .flatMap(doc -> documentChunkRepository.findByDocumentId(doc.getId()).stream())
                 .toList();
 
@@ -58,7 +60,7 @@ public class ClaimMatchingServiceImpl implements ClaimMatchingService {
 
     private AiSuggestion buildSuggestion(Claim claim, DocumentChunk chunk) {
         AiSuggestion suggestion = new AiSuggestion();
-suggestion.setClaim(claim);
+        suggestion.setClaim(claim);
         suggestion.setDocumentChunk(chunk);
         suggestion.setStatus(SuggestionStatus.PENDING);
         suggestion.setScore(0.5f);

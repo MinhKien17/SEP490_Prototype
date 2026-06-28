@@ -3,17 +3,18 @@ package com.evidencepilot.controller;
 import com.evidencepilot.dto.response.TraceabilityExportResponse;
 import com.evidencepilot.model.Claim;
 import com.evidencepilot.model.DocumentChunk;
+import com.evidencepilot.model.DocumentReference;
 import com.evidencepilot.model.EvidenceEdge;
 import com.evidencepilot.model.Project;
-import com.evidencepilot.model.SourceReference;
 import com.evidencepilot.model.User;
+import com.evidencepilot.model.enums.DocumentType;
 import com.evidencepilot.repository.ClaimRepository;
 import com.evidencepilot.repository.DocumentChunkRepository;
+import com.evidencepilot.repository.DocumentReferenceRepository;
+import com.evidencepilot.repository.DocumentRepository;
 import com.evidencepilot.repository.EvidenceEdgeRepository;
 import com.evidencepilot.repository.FeedbackRequestRepository;
 import com.evidencepilot.repository.ProjectRepository;
-import com.evidencepilot.repository.SourceReferenceRepository;
-import com.evidencepilot.repository.SourceRepository;
 import com.evidencepilot.service.ClaimMatchingService;
 import com.evidencepilot.service.CurrentUserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -49,8 +50,8 @@ public class TraceabilityExportController {
 
     private final ProjectRepository projectRepository;
     private final ClaimRepository claimRepository;
-    private final SourceRepository sourceRepository;
-    private final SourceReferenceRepository sourceReferenceRepository;
+    private final DocumentRepository documentRepository;
+    private final DocumentReferenceRepository documentReferenceRepository;
     private final FeedbackRequestRepository feedbackRequestRepository;
     private final EvidenceEdgeRepository evidenceEdgeRepository;
     private final DocumentChunkRepository documentChunkRepository;
@@ -79,18 +80,19 @@ public class TraceabilityExportController {
         }
         currentUserService.requireProjectAccess(currentUser, project);
 
-        List<SourceReference> references = sourceReferenceRepository
-                .findBySourceProjectIdAndSourceActiveTrueOrderBySourceIdAscReferenceIndexAsc(projectId);
+        List<DocumentReference> references = documentReferenceRepository
+                .findByDocumentProjectIdAndDocumentDocTypeAndDocumentActiveTrueOrderByDocumentIdAscReferenceIndexAsc(
+                        projectId, DocumentType.SOURCE);
 
-        Map<UUID, SourceReference> firstReferenceBySource = references.stream()
+        Map<UUID, DocumentReference> firstReferenceBySource = references.stream()
                 .collect(Collectors.toMap(
-                        reference -> reference.getSource().getId(),
+                        reference -> reference.getDocument().getId(),
                         reference -> reference,
                         (first, ignored) -> first
                 ));
         Map<UUID, Long> referenceCountBySource = references.stream()
                 .collect(Collectors.groupingBy(
-                        reference -> reference.getSource().getId(),
+                        reference -> reference.getDocument().getId(),
                         Collectors.counting()));
 
         List<TraceabilityExportResponse.TraceabilityClaim> claims = claimRepository
@@ -100,8 +102,8 @@ public class TraceabilityExportController {
                 .map(claim -> claimExport(claim, projectId, firstReferenceBySource))
                 .toList();
 
-        List<TraceabilityExportResponse.TraceabilitySource> sources = sourceRepository
-                .findByProjectIdAndActiveTrue(projectId)
+        List<TraceabilityExportResponse.TraceabilitySource> sources = documentRepository
+                .findByProjectIdAndDocTypeAndActiveTrue(projectId, DocumentType.SOURCE)
                 .stream()
                 .map(source -> new TraceabilityExportResponse.TraceabilitySource(
                         source.getId(),
@@ -133,7 +135,7 @@ public class TraceabilityExportController {
 
     private TraceabilityExportResponse.TraceabilityClaim claimExport(
             Claim claim, UUID projectId,
-            Map<UUID, SourceReference> firstReferenceBySource) {
+            Map<UUID, DocumentReference> firstReferenceBySource) {
 
         List<TraceabilityExportResponse.TraceabilityMatch> matches = claimMatchingService
                 .matchClaim(claim.getId(), projectId)
@@ -146,7 +148,7 @@ public class TraceabilityExportController {
                             ? chunk.getDocument().getId() : null;
                     String filename = chunk != null && chunk.getDocument() != null
                             ? missingIfBlank(chunk.getDocument().getOriginalFilename()) : MISSING;
-                    SourceReference reference = sourceId != null
+                    DocumentReference reference = sourceId != null
                             ? firstReferenceBySource.get(sourceId) : null;
                     return new TraceabilityExportResponse.TraceabilityMatch(
                             sourceId != null ? sourceId.toString() : MISSING,
