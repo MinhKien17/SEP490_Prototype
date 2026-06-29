@@ -75,17 +75,20 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Override
     public DocumentResponse getDocumentById(UUID id) {
-        return DocumentResponse.from(documentRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException(id, "Document")));
+        var currentUser = currentUserService.requireCurrentUser();
+        Document doc = findDocument(id);
+        requireDocumentAccess(currentUser, doc);
+        return DocumentResponse.from(doc);
     }
 
     @Override
     public DocumentResponse getSourceById(UUID id) {
-        Document doc = documentRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException(id, "Document"));
+        var currentUser = currentUserService.requireCurrentUser();
+        Document doc = findDocument(id);
         if (doc.getDocType() != DocumentType.SOURCE || !doc.isActive()) {
             throw new ResourceNotFoundException(id, "Source");
         }
+        requireDocumentAccess(currentUser, doc);
         return DocumentResponse.from(doc);
     }
 
@@ -108,6 +111,7 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Override
     public List<DocumentResponse> getDocumentsByProject(UUID projectId) {
+        requireProjectAccess(projectId);
         return documentRepository.findByProjectId(projectId).stream()
                 .map(DocumentResponse::from)
                 .toList();
@@ -167,6 +171,7 @@ public class DocumentServiceImpl implements DocumentService {
         if (projectId != null) {
             project = projectRepository.findById(projectId)
                     .orElseThrow(() -> new ResourceNotFoundException(projectId, "Project"));
+            currentUserService.requireProjectAccess(currentUser, project);
         }
 
         com.evidencepilot.model.Collection collection = null;
@@ -216,9 +221,9 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Override
     public List<DocumentChunkResponse> getDocumentChunks(UUID documentId) {
-        if (!documentRepository.existsById(documentId)) {
-            throw new ResourceNotFoundException(documentId, "Document");
-        }
+        var currentUser = currentUserService.requireCurrentUser();
+        Document doc = findDocument(documentId);
+        requireDocumentAccess(currentUser, doc);
         return documentChunkRepository.findByDocumentIdOrderByChunkIndexAsc(documentId).stream()
                 .map(documentMapper::toDocumentChunkResponse)
                 .toList();
@@ -226,9 +231,9 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Override
     public DocumentTextResponse getDocumentText(UUID documentId) {
-        if (!documentRepository.existsById(documentId)) {
-            throw new ResourceNotFoundException(documentId, "Document");
-        }
+        var currentUser = currentUserService.requireCurrentUser();
+        Document doc = findDocument(documentId);
+        requireDocumentAccess(currentUser, doc);
         var text = documentTextRepository.findByDocumentId(documentId);
         if (text == null) {
             throw new ResourceNotFoundException("Document text not found for document " + documentId);
@@ -239,10 +244,28 @@ public class DocumentServiceImpl implements DocumentService {
     @Override
     @Transactional
     public void deleteDocument(UUID id) {
-        Document doc = documentRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException(id, "Document"));
+        var currentUser = currentUserService.requireCurrentUser();
+        Document doc = findDocument(id);
+        requireDocumentAccess(currentUser, doc);
         doc.setActive(false);
         documentRepository.save(doc);
+    }
+
+    private Document findDocument(UUID id) {
+        return documentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(id, "Document"));
+    }
+
+    private void requireDocumentAccess(User currentUser, Document doc) {
+        if (doc.getProject() != null) {
+            currentUserService.requireProjectAccess(currentUser, doc.getProject());
+            return;
+        }
+        if (doc.getCollection() != null) {
+            currentUserService.requireCollectionAccess(currentUser, doc.getCollection());
+            return;
+        }
+        currentUserService.requireUserIdOrAdmin(currentUser, doc.getUploadedBy().getId());
     }
 
     private void requireProjectAccess(UUID projectId) {
