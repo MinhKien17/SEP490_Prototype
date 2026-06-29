@@ -55,7 +55,7 @@ public class SecurityConfig {
                                 "/ws/**")
                         .permitAll()
                         .requestMatchers("/api/auth/update-password").authenticated()
-                        .requestMatchers("/api/users/me").authenticated()
+                        .requestMatchers("/api/users/profile").authenticated()
                         .requestMatchers("/api/users/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

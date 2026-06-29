@@ -62,8 +62,8 @@ class ProjectRouteMappingTest {
     void userSelfServiceRouteMatchesSecurityConfig() {
         Set<String> paths = controllerPaths(UserController.class);
 
-        assertThat(paths).contains("/api/users/me");
-        assertThat(paths).doesNotContain("/api/users/profile");
+        assertThat(paths).contains("/api/users/profile");
+        assertThat(paths).doesNotContain("/api/users/me");
     }
 
     private static Set<String> controllerPaths(Class<?> controller) {
