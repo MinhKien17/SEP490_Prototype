@@ -4,30 +4,54 @@
 
 ```mermaid
 flowchart LR
-    Client["Client / Frontend"]
-    API["Spring Boot API\nREST + WebSocket"]
-    Security["JWT filter + access checks"]
-    Services["Application services"]
-    Repos["JPA repositories"]
-    MySQL[("MySQL")]
-    MinIO[("MinIO\nraw document storage")]
-    Rabbit["RabbitMQ\nextraction queue"]
-    Worker["Document extraction worker"]
-    Qdrant[("Qdrant\nvector index")]
-    AI["AI model API\nextraction, embeddings, review"]
+    subgraph Client Layer
+        Client["Client / Frontend"]
+    end
 
+    subgraph Core Application
+        API["Spring Boot API\nREST + WebSocket"]
+        Security["JWT filter + access checks"]
+        Services["Application services"]
+        Repos["JPA repositories"]
+    end
+
+    subgraph Data Layer
+        MySQL[("MySQL")]
+        MinIO[("MinIO\nraw document storage")]
+        Qdrant[("Qdrant\nvector index")]
+    end
+
+    subgraph Asynchronous Extraction Pipeline
+        Rabbit["RabbitMQ\nextraction queue"]
+        DLQ["RabbitMQ\nDead-Letter Queue (DLQ)"]
+        Worker["Document extraction worker"]
+    end
+
+    subgraph External / AI Services
+        AI["AI model API\nextraction, embeddings, review"]
+    end
+
+    %% Core Flow
     Client --> API
     API --> Security
     Security --> Services
     Services --> Repos
-    Repos --> MySQL\n
+
+    %% Synchronous Data Access
+    Repos --> MySQL
     Services --> MinIO
-    Services --> Rabbit
-    Rabbit --> Worker
-    Worker -->|"save extracted chunks"| MySQL
+    
+    %% Asynchronous Messaging (Dashed Lines)
+    Services -.->|"publish"| Rabbit
+    Rabbit -.->|"consume"| Worker
+    Worker -.->|"reject / fail"| DLQ
+
+    %% Worker Operations
+    Worker -->|"save extracted chunks / updates"| MySQL
     Worker -->|"request extraction/embeddings"| AI
-    AI -->|"return embeddings"| Worker
     Worker -->|"upsert chunk vectors"| Qdrant
+
+    %% Direct Service Operations
     Services -->|"claim evaluation"| AI
     Services -->|"vector search"| Qdrant
 ```
@@ -38,110 +62,156 @@ business data kept in MySQL, uploaded files in MinIO, and searchable vectors in 
 
 ```mermaid
 flowchart TD
-    Upload["Upload paper/source document"]
-    StoreFile["Store raw file in MinIO"]
-    SaveDoc["Save document metadata\nprocessing_status = UPLOADED/QUEUED"]
-    Queue["Publish extraction job to RabbitMQ"]
-    Extract["Worker extracts text"]
-    Chunks["Persist document_texts,\ndocument_chunks, references, sections"]
-    Embed["AI model returns embeddings to worker"]
-    Vector["Worker upserts source chunks to Qdrant"]
-    Ready["Mark document READY/COMPLETED"]
-    Claim["Create or update claims"]
-    Match["Evaluate claim against document context"]
-    Suggestions["Create AI suggestions and evidence edges"]
-    Mapping["Student accepts mapping or creates manual mapping"]
-    Feedback["Submit feedback request and instructor feedback"]
-    Export["Traceability export reads claims,\nsources, mappings, edges, feedback"]
+    subgraph Document Ingestion Pipeline [Automated Background Process]
+        Upload["Upload source document"] --> StoreFile["Store raw file (MinIO)"]
+        StoreFile --> MarkUploaded["Save to DB: status = UPLOADED"]
+        
+        MarkUploaded --> PushQueue["Publish job to RabbitMQ"]
+        
+        PushQueue -->|Ack Success| SaveQueued["Update DB: status = QUEUED"]
+        PushQueue -->|Failure or Timeout| FailState["Update DB: status = FAILED"]
+        
+        SaveQueued --> AIParsing["Worker: Send raw file to AI API for Markdown Extraction"]
+        
+        AIParsing -->|Returns Markdown| Chunks["Worker: Chunk Markdown & Persist (MySQL)"]
+        AIParsing -->|Failure or Timeout| FailState
+        
+        Chunks --> GenEmbed["Worker: Send chunks to AI API for Embeddings"]
+        
+        GenEmbed -->|Returns Vectors| Vector["Worker: Upsert vectors (Qdrant)"]
+        GenEmbed -->|Failure or Timeout| FailState
+        
+        Vector --> Ready["Update DB: status = READY"]
+    end
+```
 
-    Upload --> StoreFile
-    Upload --> SaveDoc
-    SaveDoc --> Queue
-    Queue --> Extract
-    Extract --> Chunks
-    Chunks --> Embed
-    Embed --> Vector
-    Vector --> Ready
-    Claim --> Match
-    Match --> Suggestions
-    Suggestions --> Mapping
-    Mapping --> Export
-    Feedback --> Export
+```mermaid
+flowchart TD
+    subgraph User Workflow & Evaluation [Interactive Process]
+        CreateClaim["Create or update claim"] --> Match["Evaluate claim against Ready documents"]
+        Match --> Suggestions["Generate AI suggestions & edges"]
+        
+        Suggestions --> UserAction{Student Decision}
+        UserAction -->|Accepts AI| Mapping["Save automated mapping"]
+        UserAction -->|Overrides AI| Mapping["Save manual mapping"]
+        
+        Mapping --> Feedback["Submit for instructor feedback"]
+        
+        Feedback --> Export["Generate Traceability Export"]
+        Mapping --> Export
+    end
 ```
 
 ## Main Workflow Activity Diagrams
 
-### Authentication And Email Verification
+### 1.Authentication And Email Verification
 
 ```mermaid
 flowchart TD
-    Start["User registers"] --> Validate["Validate email and password"]
-    Validate --> Duplicate{"Email already exists?"}
+    Register["POST /api/auth/register"] --> Validate["Validate email and password format"]
+    Validate --> Duplicate{"Email exists?"}
     Duplicate -->|Yes| Conflict["409 Conflict"]
-    Duplicate -->|No| Save["Save user with BCrypt password"]
+    Duplicate -->|No| Save["Save user with BCrypt"]
     Save --> Token["Create verification token"]
     Token --> Mail["Send verification email"]
     Mail --> Verify["GET /api/auth/verify-email?token=..."]
-    Verify --> TokenOk{"Token valid and not expired?"}
-    TokenOk -->|No| Reject["400/404 verification failure"]
+    Verify --> TokenOk{"Token valid?"}
+    TokenOk -->|No| Reject["400/404 Failure"]
     TokenOk -->|Yes| Active["Set email_verified = true"]
     Active --> Login["POST /api/auth/login"]
     Login --> Jwt["Return JWT with role"]
 ```
 
-### Project Review Workflow
+### 2.Workspace & Entity Lifecycle Workflow
 
 ```mermaid
 flowchart TD
-    Draft["Student creates project\nstatus = DRAFT"] --> Work["Upload papers, sources, claims\nstatus = ACTIVE"]
+    Create["POST /api/projects"] --> SaveProj["Save project with role=OWNER"]
+    SaveProj --> DeleteReq["DELETE /api/projects/{id}"]
+    DeleteReq --> MarkDeleted["Soft Delete: projects.deleted_at = NOW"]
+    MarkDeleted --> PushCleanup["Publish cleanup job to RabbitMQ"]
+    PushCleanup --> Confirm["Return 204 No Content"]
+    Confirm --> ConsumeJob["Worker consumes cleanup job"]
+    ConsumeJob --> DropMinIO["Delete raw files from MinIO"]
+    DropMinIO --> DropQdrant["Delete vectors from Qdrant"]
+    DropQdrant --> HardDelete["Hard delete project from MySQL"]
+```
+
+### 3.Source Ingestion & Asynchronous Extraction Pipeline
+
+```mermaid
+flowchart TD
+    Upload["POST /api/sources or /api/papers"] --> StoreFile["Store raw file in MinIO"]
+    StoreFile --> MarkUploaded["DB status = UPLOADED"]
+    MarkUploaded --> PushQueue["Publish to RabbitMQ"]
+    PushQueue -->|Ack Success| SaveQueued["DB status = QUEUED"]
+    PushQueue -->|Failure| FailInit["DB status = FAILED"]
+    SaveQueued --> ConsumeJob["Worker consumes job"]
+    ConsumeJob --> AIParsing["Worker requests AI Markdown Parsing"]
+    AIParsing -->|Success| Chunking["Chunk Markdown & Persist to MySQL"]
+    AIParsing -->|Failure| WorkerFail["DB status = FAILED"]
+    Chunking --> GenEmbed["Request AI Vector Embeddings"]
+    GenEmbed -->|Success| VectorDB["Upsert to Qdrant"]
+    GenEmbed -->|Failure| WorkerFail
+    VectorDB --> Ready["DB status = READY"]
+```
+
+### 4.Automated Claim Evaluation Workflow
+
+```mermaid
+flowchart TD
+    Trigger["Document Ready Trigger"] --> FetchClaim["Fetch active claims for project"]
+    FetchClaim --> SearchVectors["Perform Vector Similarity Search in Qdrant"]
+    SearchVectors --> EvaluateMatch["AI evaluates claim vs document context"]
+    EvaluateMatch -->|Match Found| SaveEdges["Persist edge type = AI_GENERATED"]
+    EvaluateMatch -->|No Match| UpdateStatus["Update claim_evaluations.status"]
+    SaveEdges --> UpdateStatus
+```
+
+### 5.Manual Mapping & AI Override Workflow
+
+```mermaid
+flowchart TD
+    ReviewAI["Review AI Suggested Evidence"] --> Decision{"Accept AI?"}
+    Decision -->|Yes| AcceptEdge["Update edge type = AI_ACCEPTED"]
+    Decision -->|No| RejectEdge["Update edge status = REJECTED"]
+    RejectEdge --> ManualSelect["Highlight specific document text"]
+    ManualSelect --> SubmitOverride["POST /api/mappings"]
+    SubmitOverride --> CreateManual["Create edge type = HUMAN_VERIFIED"]
+    AcceptEdge --> UpdateClaim["Recalculate claim confidence score"]
+    CreateManual --> UpdateClaim
+```
+
+### 6.Project Review & Handoff Workflow
+
+```mermaid
+flowchart TD
+    Draft["Student creates project status = DRAFT"] --> Work["Upload papers, sources, claims status = ACTIVE"]
     Work --> Submit["POST /api/projects/{projectId}/reviews"]
-    Submit --> Pending["feedback_requests.status = PENDING\nprojects.status = IN_REVIEW"]
+    Submit --> CheckState{"Project ACTIVE?"}
+    CheckState -->|No| RejectAction["400 / 403 Error"]
+    CheckState -->|Yes| Pending["Create feedback_request PENDING and update project IN_REVIEW"]
     Pending --> Instructor["Instructor reviews project"]
     Instructor --> Feedback["POST /api/feedback-requests/{id}/feedback"]
     Feedback --> Decision["PATCH /api/feedback-requests/{id}/status"]
-    Decision --> Returned["feedback_requests.status = RETURNED"]
-    Decision --> Reviewed["feedback_requests.status = REVIEWED"]
-    Decision --> Rejected["feedback_requests.status = REJECTED"]
-    Returned --> Closed["Feedback request closed"]
-    Reviewed --> Closed
-    Rejected --> Closed
-    Closed --> Active["projects.status = ACTIVE"]
-    Active -->|new feedback_requests| Submit
+    Decision --> Process["Process Instructor payload"]
+    Process --> CloseRequest["Update request Final State and update project ACTIVE"]
 ```
 
-### Source And Paper Processing Workflow
-
+### 7.Traceability Export Generation Workflow
 ```mermaid
 flowchart TD
-    Upload["POST /api/sources or /api/papers"] --> Access["Project, collection, or uploader access check"]
-    Access --> Object["Upload raw file to MinIO"]
-    Object --> Queue["RabbitMQ extraction"]
-    Queue --> Worker["DocumentExtractionListener receives job"]
-    Worker --> Extract["AI model extraction called"]
-    Extract --> Persist["Save text, chunks, references, sections"]
-    Persist --> Embed["Generate dense/sparse vectors"]
-    Embed --> Upsert["Upsert vectors into Qdrant"]
-    Upsert --> Ready["documents.processing_status = READY"]
-    Worker --> Failed["documents.processing_status = FAILED"]
+    RequestExport["GET /api/projects/{id}/export"] --> ValidateAccess["Verify project access"]
+    ValidateAccess --> Aggregate["Aggregate Claims, Sources, Edges, Feedback"]
+    Aggregate --> GenerateDoc["Generate PDF/CSV Artifact"]
+    GenerateDoc --> UploadMinIO["Upload artifact to MinIO"]
+    UploadMinIO --> CreateSignedURL["Generate Presigned URL"]
+    CreateSignedURL --> ReturnURL["Return URL to client"]
+    ReturnURL --> Download["User downloads file"]
 ```
 
-### Claim Evaluation And Traceability Workflow
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-### Notification Workflow
-
+### 8.System Notification & Event Workflow
 ```mermaid
 flowchart TD
     Event["Project, document, member, or feedback event"] --> Persist["Insert system_notifications row"]
