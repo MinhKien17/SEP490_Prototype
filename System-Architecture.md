@@ -221,6 +221,102 @@ flowchart TD
     Inbox --> Read["PATCH /api/notifications/{id}/read"]
 ```
 
+## Actor-Oriented Activity Diagrams
+
+These diagrams show the main business flows by participating actor. Internal API, queue, database, and worker steps stay in the previous workflow diagrams.
+
+### Student Project And Source Preparation
+
+```mermaid
+flowchart TD
+    subgraph Student
+        S1["Register or login"]
+        S2["Create project"]
+        S3["Upload paper and source documents"]
+        S4["Create project claims"]
+    end
+
+    subgraph System
+        A1["Verify account access"]
+        A2["Store project workspace"]
+        A3["Extract and index documents"]
+        A4["Prepare claims for evaluation"]
+    end
+
+    S1 --> A1 --> S2
+    S2 --> A2 --> S3
+    S3 --> A3 --> S4
+    S4 --> A4
+```
+
+### Evidence Review And Mapping
+
+```mermaid
+flowchart TD
+    subgraph Student
+        S1["Review AI evidence suggestions"]
+        S2{"Use suggestion?"}
+        S3["Accept suggestion"]
+        S4["Select evidence manually"]
+    end
+
+    subgraph System
+        A1["Match claims with indexed sources"]
+        A2["Save evidence mapping"]
+        A3["Update traceability status"]
+    end
+
+    A1 --> S1 --> S2
+    S2 -->|Yes| S3 --> A2
+    S2 -->|No| S4 --> A2
+    A2 --> A3
+```
+
+### Instructor Review And Feedback
+
+```mermaid
+flowchart TD
+    subgraph Student
+        S1["Submit project for review"]
+        S2["Read instructor feedback"]
+        S3["Revise project evidence"]
+    end
+
+    subgraph Instructor
+        I1["Open submitted project"]
+        I2{"Approve evidence?"}
+        I3["Send feedback"]
+    end
+
+    subgraph System
+        A1["Mark project in review"]
+        A2["Notify instructor"]
+        A3["Store feedback and notify student"]
+    end
+
+    S1 --> A1 --> A2 --> I1 --> I2
+    I2 -->|No| I3 --> A3 --> S2 --> S3
+    I2 -->|Yes| A3
+```
+
+### Traceability Export
+
+```mermaid
+flowchart TD
+    subgraph Student
+        S1["Request traceability export"]
+        S2["Download export file"]
+    end
+
+    subgraph System
+        A1["Validate project access"]
+        A2["Collect claims, sources, mappings, and feedback"]
+        A3["Generate export artifact"]
+    end
+
+    S1 --> A1 --> A2 --> A3 --> S2
+```
+
 ## Entity State Machines
 
 ### User Account
